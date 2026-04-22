@@ -4,13 +4,15 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 
 ---
 
-## Phase 0 — Spec the API *(current phase)*
+## Phase 0 — Spec the API *(complete)*
 
-**Goal:** A TypeScript sketch of the five primitives that a developer could look at and understand what Stigmergy offers, without any implementation yet.
+**Goal:** A TypeScript sketch of the primitives a developer could look at and understand what Stigmergy offers, without any implementation yet.
 
 **Deliverables:**
-- `src/types.ts` — interfaces for `Medium`, `Signal`, `Decay`, `Role`, `Validator`, `LocalQuery`.
+- `src/types.ts` — interfaces for `Medium`, `Signal`, `Decay`, `Role`, `Agent`, `Validator`, `LocalQuery`.
+- `docs/primitives.md` — the six primitives as a concrete spec.
 - `docs/api-sketch.md` — prose walkthrough of how a developer uses the framework. Minimal example.
+- `docs/files.md` — the CHARTER / SOUL / SKILL / MEMORY convention.
 - User has read and signed off on the shape.
 
 **Rules for this phase:**
@@ -18,22 +20,29 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 - No Postgres schema yet. That's Phase 1.
 - Iterate with the user. The API is the product — it matters more than the implementation.
 
-**Done when:** The user looks at `src/types.ts` and says "yes, this is what I want to use."
+**Done when:** The user looks at `src/types.ts` and says "yes, this is what I want to use." ✓
 
 ---
 
-## Phase 1 — Reference implementation
+## Phase 1 — Reference implementation *(current phase)*
 
 **Goal:** A working `stigmergy` npm package that runs against Postgres (Supabase-compatible) and implements the primitives spec'd in Phase 0.
 
-**Deliverables:**
+**Tech decisions:**
+- Postgres client: [postgres-js (Porsager)](https://github.com/porsager/postgres).
+- Schema strategy: per-type tables (one table per registered signal type).
+- Test substrate: [PGlite](https://github.com/electric-sql/pglite) — in-process Postgres, zero-install for contributors.
+- Formatter/linter: Biome. Test framework: Vitest. Node 22+, ESM only.
+
+**Deliverables (in order — each sub-step ends in something reviewable):**
 - `src/medium.ts` — Postgres-backed medium with declared signal types.
 - `src/decay.ts` — all three decay mechanisms (explicit expiry, strength decay, reinforcement-only).
 - `src/role.ts` — role definition with local-query enforcement.
-- `src/validator.ts` — validator hook with rule-based and webhook-based triggers.
-- `src/runtime.ts` — `run(role, handler)` loop.
-- Migration file(s) to stand up a bare Stigmergy schema in a fresh Supabase project.
-- Vitest test suite covering each primitive in isolation.
+- `src/agent.ts` — agent definition with file loading (charter, soul, skills, memory).
+- `src/validator.ts` — validator hook with rule-based and webhook-based triggers; hot-swap via `updateValidator`.
+- `src/runtime.ts` — `run(agent, handler)` loop.
+- `migrations/` — SQL files to stand up a bare Stigmergy schema in a fresh Postgres.
+- Vitest test suite covering each primitive in isolation, running against PGlite.
 - One end-to-end example in `examples/` — three agents, one medium, decay, validation, the whole loop — small enough to read in ten minutes.
 
 **Rules for this phase:**
