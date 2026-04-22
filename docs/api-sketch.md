@@ -203,46 +203,60 @@ await medium.run(Scout, async (ctx) => {
   // They are plain text. The framework does not interpret them —
   // the handler passes them to its LLM calls as needed.
 
-  // Survey the landscape across roles. This is how role selection works.
-  const faintTrails = await ctx.as(ScoutRole).view();
-  const urgentWork = await ctx.as(WorkerRole).view();
+  // Polyethism, the stigmergic way: gather every signal the agent's roles
+  // can see, score by pressure, and act on whichever is loudest. The
+  // handler is not routing through a menu — it's responding to a gradient.
+  const pressures = (
+    await Promise.all(
+      Scout.roles.map(async (role) => {
+        const signals = await ctx.as(role).view();
+        return signals.map((s) => ({
+          role,
+          signal: s,
+          pressure: s.strength ?? 1,  // expiry-decay signals carry binary pressure
+        }));
+      })
+    )
+  ).flat();
 
-  // Polyethism: pick the role the medium is calling for.
-  if (urgentWork.length > 0) {
-    const target = urgentWork[0];
-    const worker = ctx.as(WorkerRole);
-    const claimed = await worker.tryClaim(target.id, { until: "6h" });
-    if (!claimed) return;
+  const loudest = pressures.sort((a, b) => b.pressure - a.pressure)[0];
 
-    const result = await buildPrototype(target.payload.niche, {
-      soul: ctx.soul,
-      skills: ctx.skills,
-      memory: ctx.memory,
-      charter: ctx.charter,
-    });
-
-    await worker.deposit("worker_result", {
-      niche: target.payload.niche,
-      outcome: result.outcome,
-      body: result.notes,
-    });
-
-    await worker.release(target.id);
-  } else if (faintTrails.length < 5) {
-    const scout = ctx.as(ScoutRole);
+  if (!loudest) {
+    // Nothing pulling at this agent. Explore: deposit a fresh, faint trail
+    // so the next agent has something to react to. (Exploration is what an
+    // ant does when it finds no pheromone to follow.)
     const niche = await pickFreshNiche(ctx.soul, ctx.memory, ctx.charter);
-    const report = await investigate(niche, ctx.skills);
-
-    await scout.deposit("demand_pheromone", {
+    await ctx.as(ScoutRole).deposit("demand_pheromone", {
       niche,
       claimed_by: null,
       claimed_until: null,
     });
-    await scout.deposit("scout_report", {
-      niche,
-      body: report.markdown,
-      recommended_strength: report.score,
-    });
+  } else {
+    // Act in whichever role surfaced the loudest signal. The agent doesn't
+    // pick a role then look for work; the work picks the role.
+    const role = ctx.as(loudest.role);
+    const claimed = await role.tryClaim(loudest.signal.id, { until: "6h" });
+    if (!claimed) return;  // another agent got there first
+
+    if (loudest.role === WorkerRole) {
+      const result = await buildPrototype(loudest.signal.payload.niche, {
+        soul: ctx.soul, skills: ctx.skills, memory: ctx.memory, charter: ctx.charter,
+      });
+      await role.deposit("worker_result", {
+        niche: loudest.signal.payload.niche,
+        outcome: result.outcome,
+        body: result.notes,
+      });
+    } else {
+      const report = await investigate(loudest.signal.payload.niche, ctx.skills);
+      await role.deposit("scout_report", {
+        niche: loudest.signal.payload.niche,
+        body: report.markdown,
+        recommended_strength: report.score,
+      });
+    }
+
+    await role.release(loudest.signal.id);
   }
 
   // End-of-run: consolidate memory. The agent's LLM distills what it

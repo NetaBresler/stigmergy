@@ -89,9 +89,9 @@ A given Stigmergy system may define arbitrarily many roles beyond these three. T
 
 **The identity that enacts roles. Distinct from the role it's enacting.**
 
-Roles describe functions. Agents are who perform them. In biology, one ant has a fixed genome and morphology but performs different functions over its lifetime — nurse, food-processor, forager. This is called **polyethism**, and it is the default pattern in social-insect colonies.
+One ant does many jobs across its life — nurse when young, food-processor in middle age, forager at the end. It's always the same ant. Its identity doesn't change; its function does. Stigmergy makes the same split. An *Agent* is who a colony member is. A *Role* is what function they're enacting at this moment. Agents carry persistent identity (personality, capabilities, memory). Roles are a menu of functions an Agent can step into as the medium's pressure shifts.
 
-For LLM agents, the same split matters. An agent has persistent identity (personality, values, voice), persistent capabilities (tools, skills), and accumulated learnings (memory). At any given tick, it selects which of its roles to enact based on what the medium shows.
+(The biology term is **polyethism** — task differentiation within an organism over time, the default pattern in social-insect colonies. The split between persistent identity and shifting function is what polyethism formalizes.)
 
 ### Requirements
 

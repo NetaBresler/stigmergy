@@ -104,6 +104,8 @@ This is the biomimetic forgetting pass. Neurons consolidate memory during sleep 
 
 **Raw event logs belong in the medium.** If the information is useful to other agents, it's a signal with framework-level decay. If it's private and distilled, it's memory.
 
+**Honest disclaimer about the soft edge.** The framework provides architectural pressure toward consolidation — `writeMemory(text)` replaces the whole file, there is no append API, every write is a full rewrite — but it cannot force the agent to actually distill. A handler whose LLM lazily re-emits the previous memory plus a new event will grow MEMORY.md forever. The framework may later cap MEMORY.md size to force compression; for now, the discipline is in the agent's prompt (instruct the LLM to consolidate, not append) rather than in the type system. Stigmergy's tone here is "here are the forces, here is where discipline still required" — not "we've got this."
+
 **No external standard exists yet.** Format is a Stigmergy convention for now.
 
 ---
