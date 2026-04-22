@@ -8,27 +8,32 @@ No runtime exists yet. Every code block below is aspirational. If the shape feel
 
 ## The scenario
 
-A toy colony with three moving parts:
+A toy colony with the following moving parts:
 
 - **One quantitative signal** — a `demand_pheromone` that says "this niche looks promising" with a strength that decays if nobody reinforces it.
-- **One qualitative signal** — a `scout_report` with a freeform markdown body, carrying what the Scout learned about the niche.
-- **Two roles** — a `Scout` that explores new niches and deposits demand + reports, a `Validator` role's work is separate (see below) but there's a `Worker` role that picks up high-strength demand and builds a prototype.
-- **One validator** — approves `scout_report` signals that meet a quality bar, which reinforces the associated demand pheromone.
+- **One qualitative signal** — a `scout_report` with a freeform markdown body.
+- **Two roles** — `ScoutRole` (explore new territory, deposit demand + reports) and `WorkerRole` (pick up high-strength demand and build a prototype).
+- **One agent** — `Scout`, who can enact *either* role depending on what the medium shows.
+- **One validator** — approves `scout_report` signals that meet a quality bar, which boosts the associated demand pheromone.
+- **A charter** at colony level and a soul, skills, and memory file per agent.
 
 Small enough to fit on a screen. Real enough to exercise every primitive.
 
 ---
 
-## Defining the medium
+## Opening the medium
 
 ```ts
 import { defineMedium } from "stigmergy";
 import { z } from "zod";
 
-const medium = defineMedium({ url: process.env.DATABASE_URL! });
+const medium = defineMedium({
+  url: process.env.DATABASE_URL!,
+  charter: "./charter.md",  // shared across every agent
+});
 ```
 
-That's it. No tables created yet — that's a migration concern for Phase 1. The medium is a handle that will grow a registry as we declare signals and roles on it.
+The charter is loaded once and exposed as `ctx.charter` in every handler. One per medium.
 
 ---
 
@@ -48,9 +53,9 @@ const demandPheromone = medium.defineSignal({
 });
 ```
 
-What's happening: every hour, every `demand_pheromone`'s strength is multiplied by 0.9. A pheromone that started at `1.0` is at `~0.35` after ten hours and drops below the `0.05` floor — invisible to readers — after about 28. If something keeps reinforcing it (see the validator below), it stays alive.
+Every hour, every `demand_pheromone`'s strength is multiplied by 0.9. Below `0.05` it's invisible to readers. Reinforcement keeps it alive.
 
-Note the `claimed_by` / `claimed_until` fields on the shape. That's the claim-as-convention pattern — no new primitive, just fields. A Scout that wants to investigate a niche atomically claims the pheromone via `ctx.tryClaim()`. The claim's lifetime is `claimed_until`, which the Scout can set to outlive its own run.
+`claimed_by` / `claimed_until` are shape fields — the claim-as-convention pattern. No new primitive, just fields. `ctx.tryClaim()` does the atomic write.
 
 A qualitative signal — a report with a markdown body:
 
@@ -60,39 +65,15 @@ const scoutReport = medium.defineSignal({
   decay: { kind: "expiry", after: "72h" },
   shape: z.object({
     niche: z.string(),
-    body: z.string(),              // markdown — this is the qualitative channel
+    body: z.string(),
     recommended_strength: z.number(),
   }),
 });
 ```
 
-Reports live for 72 hours. If a Validator approves the report in that window, the report's approval cascades into a strength boost on the matching `demand_pheromone`. If nobody approves, the report just vanishes — no archaeology.
+Reports live 72 hours. An approved report's boost is applied to the matching demand pheromone (see validator below).
 
-**The rule the framework enforces:** if you try to `defineSignal` without a `decay` field, it is a type error. Not a runtime warning, not a lint rule — it does not compile. This is the whole point.
-
----
-
-## Defining roles
-
-A Scout reads no signals (it explores fresh territory) and writes demand + reports:
-
-```ts
-const Scout = medium.defineRole({
-  name: "Scout",
-  reads: [demandPheromone],       // reads existing demand to avoid re-exploring
-  writes: [demandPheromone, scoutReport],
-  localQuery: {
-    types: ["demand_pheromone"],
-    where: { op: "lt", field: "strength", value: 0.3 },  // look at faint or absent trails
-    orderBy: { field: "created_at", direction: "desc" },
-    limit: 20,
-  },
-});
-```
-
-The `localQuery` is what a Scout *can see*. It can see recent low-strength pheromones (hints that others haven't converged on). It cannot see high-strength pheromones — those are for Workers. It cannot peek at `scout_report` rows — even ones it wrote. If the Scout's handler tries to access anything outside this query, it doesn't compile.
-
-A Worker reads high-strength demand and writes progress:
+A worker result:
 
 ```ts
 const workerResult = medium.defineSignal({
@@ -104,8 +85,30 @@ const workerResult = medium.defineSignal({
     body: z.string(),
   }),
 });
+```
 
-const Worker = medium.defineRole({
+**Rule the framework enforces:** `defineSignal` without `decay` is a type error. Not runtime, not lint — the code does not compile.
+
+---
+
+## Defining roles
+
+Roles describe *functions*, not agents. They say what signals get read, what gets written, and what slice of the medium is visible.
+
+```ts
+const ScoutRole = medium.defineRole({
+  name: "Scout",
+  reads: [demandPheromone],
+  writes: [demandPheromone, scoutReport],
+  localQuery: {
+    types: ["demand_pheromone"],
+    where: { op: "lt", field: "strength", value: 0.3 },
+    orderBy: { field: "created_at", direction: "desc" },
+    limit: 20,
+  },
+});
+
+const WorkerRole = medium.defineRole({
   name: "Worker",
   reads: [demandPheromone],
   writes: [workerResult],
@@ -124,125 +127,206 @@ const Worker = medium.defineRole({
 });
 ```
 
-A Worker sees the top five unclaimed, high-strength pheromones. It knows nothing about Scouts. It knows nothing about reports. It knows only what its signals tell it.
-
-**What Locality bought us:** the Scout cannot decide "I should do the Worker's job on this one." The types won't let it. Emergence is enforced.
+ScoutRole sees faint or absent trails. WorkerRole sees top-five unclaimed, high-strength pheromones. Neither knows the other exists. Each is a bounded view; an agent in that role cannot look beyond it.
 
 ---
 
 ## Defining a validator
 
-The validator watches `scout_report` deposits and, if the report passes a quality check, reinforces the matching demand pheromone:
+The validator watches `scout_report` deposits and, if the report looks good, boosts the matching demand pheromone:
 
 ```ts
 const reportValidator = medium.defineValidator({
   triggers: [scoutReport],
-  async validate(signal) {
-    const body = signal.payload.body;
+  async validate(report, ctx) {
+    const body = report.payload.body;
     const lookGood = body.length > 200 && /\bdemand\b/.test(body);
     if (!lookGood) return { approve: false };
+
+    const [matchingPheromone] = await ctx.find("demand_pheromone", {
+      op: "eq",
+      field: "niche",
+      value: report.payload.niche,
+    });
+    if (!matchingPheromone) return { approve: true };  // nothing to reinforce
+
     return {
       approve: true,
-      boost: signal.payload.recommended_strength,
-      extend: "24h",  // also delay the report's own expiry
+      target: matchingPheromone.id,
+      boost: report.payload.recommended_strength,
     };
   },
 });
 ```
 
-The verdict is uniform whether the validator is rule-based (like this), agent-based (replace the body of `validate` with an LLM call), or human-in-the-loop (await a promise that a Telegram webhook resolves).
+The verdict is uniform whether the validator is rule-based (like this), agent-based (swap the body for an LLM call), or human-in-the-loop (await a promise that a webhook resolves). The framework applies the verdict.
 
-The framework applies the verdict. On `approve: true`, it finds the signal whose `niche` matches the report and boosts its strength. That's reinforcement. No new signal is deposited — existing state is updated. If no matching pheromone exists, the framework logs and moves on.
+If goals change mid-project, hot-swap the rule — `medium.updateValidator(reportValidator, newValidate)` — and the next report is judged under the new regime. The colony re-orients within one decay cycle.
 
 ---
 
-## Running agents
+## Defining an agent
+
+One agent, two roles. This is where polyethism lives — an agent that can enact either role depending on what the medium shows:
+
+```ts
+const Scout = medium.defineAgent({
+  id: "scout-01",
+  soul: "./agents/scout/SOUL.md",
+  skills: [
+    "./agents/scout/skills/web-research.md",
+    "./agents/scout/skills/niche-analysis.md",
+  ],
+  memory: "./agents/scout/MEMORY.md",
+  roles: [ScoutRole, WorkerRole],
+});
+```
+
+The four identity documents:
+
+- **SOUL.md** — who this agent is. Personality, voice, values, boundaries. Rarely changes.
+- **SKILL.md** files — what this agent can do. Web research, niche analysis. Added/removed as capabilities evolve.
+- **MEMORY.md** — what this agent has learned. Consolidated, not streamed. Rewritten at end of each run.
+- **CHARTER.md** — colony-wide mission. Inherited from the medium.
+
+See `docs/files.md` for the full convention.
+
+All four are optional. An agent with none is a valid agent — it just has a stable id and a set of enactable roles.
+
+---
+
+## Running the agent
 
 ```ts
 await medium.run(Scout, async (ctx) => {
-  const faintPheromones = await ctx.view();
+  // ctx.soul, ctx.skills, ctx.memory, ctx.charter are loaded.
+  // They are plain text. The framework does not interpret them —
+  // the handler passes them to its LLM calls as needed.
 
-  if (faintPheromones.length === 0) {
-    const niche = await pickFreshNiche();
-    await ctx.deposit("demand_pheromone", {
+  // Survey the landscape across roles. This is how role selection works.
+  const faintTrails = await ctx.as(ScoutRole).view();
+  const urgentWork = await ctx.as(WorkerRole).view();
+
+  // Polyethism: pick the role the medium is calling for.
+  if (urgentWork.length > 0) {
+    const target = urgentWork[0];
+    const worker = ctx.as(WorkerRole);
+    const claimed = await worker.tryClaim(target.id, { until: "6h" });
+    if (!claimed) return;
+
+    const result = await buildPrototype(target.payload.niche, {
+      soul: ctx.soul,
+      skills: ctx.skills,
+      memory: ctx.memory,
+      charter: ctx.charter,
+    });
+
+    await worker.deposit("worker_result", {
+      niche: target.payload.niche,
+      outcome: result.outcome,
+      body: result.notes,
+    });
+
+    await worker.release(target.id);
+  } else if (faintTrails.length < 5) {
+    const scout = ctx.as(ScoutRole);
+    const niche = await pickFreshNiche(ctx.soul, ctx.memory, ctx.charter);
+    const report = await investigate(niche, ctx.skills);
+
+    await scout.deposit("demand_pheromone", {
       niche,
       claimed_by: null,
       claimed_until: null,
     });
-    return;
+    await scout.deposit("scout_report", {
+      niche,
+      body: report.markdown,
+      recommended_strength: report.score,
+    });
   }
 
-  const target = faintPheromones[0];
-  const claimed = await ctx.tryClaim(target.id, { until: "2h" });
-  if (!claimed) return;  // another Scout got there first
-
-  const findings = await investigate(target.payload.niche);
-  await ctx.deposit("scout_report", {
-    niche: target.payload.niche,
-    body: findings.markdown,
-    recommended_strength: findings.score,
+  // End-of-run: consolidate memory. The agent's LLM distills what it
+  // learned this tick into a rewritten MEMORY.md. This is the
+  // biomimetic forgetting pass.
+  const consolidated = await consolidate({
+    previousMemory: ctx.memory,
+    soul: ctx.soul,
+    justHappened: /* summarize what the handler did */,
   });
-
-  await ctx.release(target.id);
+  await ctx.writeMemory(consolidated);
 });
 ```
 
-What's in `ctx`:
+What's in the context:
 
-- `view()` returns only the rows matching the Scout's localQuery. Always.
-- `deposit(...)` is type-constrained to `demand_pheromone` and `scout_report`. Calling it with `"worker_result"` is a compile error.
-- `tryClaim()` is an atomic conditional write. If two Scouts race for the same pheromone, exactly one gets `true`.
-- `release()` unclaims. Crashing without releasing is fine — the claim decays when `claimed_until` passes.
-
-There is no `ctx.medium`. There is no way, from inside the handler, to read or write outside the role's declared bounds.
+- `ctx.soul` / `ctx.skills` / `ctx.memory` / `ctx.charter` — loaded text, passed into LLM prompts by the handler.
+- `ctx.as(role)` — narrows to a role's bounded surface. Read is `role.localQuery`; write is constrained to `role.writes`.
+- `ctx.writeMemory(text)` — replaces MEMORY.md with the consolidated summary. Forgetting happens by omission.
+- No `ctx.medium`. No unbounded read. No cross-agent messaging. The agent's surface is bounded by its roles, period.
 
 ---
 
 ## The shape of the whole thing
 
 ```ts
-const medium = defineMedium({ url });
+const medium = defineMedium({ url, charter });
 
+// Signals
 const demandPheromone = medium.defineSignal({ ... });
 const scoutReport    = medium.defineSignal({ ... });
 const workerResult   = medium.defineSignal({ ... });
 
-const Scout  = medium.defineRole({ ... });
-const Worker = medium.defineRole({ ... });
+// Roles
+const ScoutRole  = medium.defineRole({ ... });
+const WorkerRole = medium.defineRole({ ... });
 
+// Validators
 const reportValidator = medium.defineValidator({ ... });
 
+// Agents
+const Scout  = medium.defineAgent({ id: "scout-01", roles: [ScoutRole, WorkerRole], ... });
+const Scout2 = medium.defineAgent({ id: "scout-02", roles: [ScoutRole, WorkerRole], ... });
+// ... more agents, same shape.
+
 await Promise.all([
-  medium.run(Scout, scoutHandler),
-  medium.run(Worker, workerHandler),
+  medium.run(Scout,  scoutHandler),
+  medium.run(Scout2, scoutHandler),
 ]);
 ```
 
-Six declarations, two handlers, one runtime call per role. That's the framework.
+---
+
+## How this answers "adaptiveness"
+
+Three loops of adaptation, all already expressed in the primitives:
+
+1. **The colony adapts to reality.** Signals that lead somewhere get reinforced by validators; signals that don't decay. Within one decay cycle, colony attention shifts to what's working.
+2. **Agents adapt across runs.** Every run ends with memory consolidation — the agent's LLM distills useful lessons into MEMORY.md and drops the noise. Over time, an agent gets better at its roles without any framework-level learning.
+3. **Goals adapt mid-work.** Update the charter, update a validator, swap a decay rate — the framework applies them live. No redeploy, no restart.
+
+No separate "adaptiveness primitive" exists because the existing primitives already compose to produce it.
 
 ---
 
 ## What this API does not have
 
-Deliberately:
-
-- **No orchestrator.** There is nothing that "runs the colony." You run roles. They coordinate through the medium.
+- **No orchestrator.** Nothing "runs the colony." You run agents. They coordinate through the medium.
 - **No messaging.** Agents cannot send each other messages. They deposit signals.
 - **No global state.** The medium owns a registry, scoped to one connection.
-- **No agent-to-agent handoffs.** No `ctx.handoffTo(otherRole)`. That's a manager.
+- **No agent-to-agent handoffs.** No `ctx.handoffTo(otherAgent)`. That's a manager.
 - **No "priority queue" primitive.** Priority is strength. Strength is a decay policy.
-- **No retry primitive.** An agent that crashed leaves its signals in the medium; the next agent's localQuery pulls them if they still matter. Retries are a pattern, not a feature.
-- **No `ctx.medium` escape hatch.** An agent's surface is bounded by its role. Period.
+- **No retry primitive.** A crashed agent's unfinished signals stay in the medium; the next agent picks them up if they still matter.
+- **No cross-agent memory.** If information matters to others, it's a signal with decay — not a shared file.
+- **No `ctx.medium` escape hatch.** An agent's surface is bounded by its roles. Period.
 
 ---
 
-## What still needs to be decided
+## Open questions this sketch surfaces
 
-A short list of open design questions this sketch surfaces but doesn't resolve:
+Flagged for Phase 1, not solved here:
 
-1. **How are agents scheduled?** `medium.run()` starts a loop, but on what cadence? Polling interval? Event-driven via Postgres `LISTEN/NOTIFY`? Both? This is a Phase 1 concern but worth flagging now.
-2. **Do we need agent identity?** `ctx.agentId` is in the sketch — it's stamped on every deposit for provenance. Is one agent ID per `run()` invocation the right granularity, or per process, or something else?
-3. **Should `DepositedSignal` expose reinforcement history?** Right now it doesn't. If a Worker wants to see "this pheromone has been reinforced three times in the last hour," that's not queryable from the type. Either we add it, or we say "query the medium directly for that" and keep the hot path simple.
-4. **Does `defineSignal` need a `version` field?** For schema evolution across deployments. Probably yes, probably not in Phase 0.
-
-I'd rather ship a small type file with these left unresolved than speculatively add knobs. We answer them when we hit them in Phase 1 or in real usage.
+1. **Scheduling.** `medium.run()` starts a loop, but on what cadence? Polling interval? Postgres `LISTEN/NOTIFY`? Both?
+2. **Agent identity persistence.** `agentId` is on every deposit. Is one agent per process the right granularity, or can one process run several agents?
+3. **Reinforcement history on DepositedSignal.** If an agent wants to see "this pheromone has been reinforced three times in the last hour," it can't — the type doesn't expose history. Either we add it, or we say "query the medium directly" and keep the hot path lean.
+4. **Signal versioning.** `defineSignal` has no `version` field yet. For schema evolution across deployments, probably yes, but not Phase 0.
+5. **Memory size control.** MEMORY.md could grow unbounded if the agent's consolidation is too verbose. The framework could cap size and force the agent to prune, or trust the agent to compress. Lean toward trust for now, revisit if it bites.

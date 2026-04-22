@@ -1,6 +1,8 @@
-# The Five Primitives
+# The Six Primitives
 
-A system is stigmergic if and only if it has all five of these. Miss one and you have something else — a knowledge base, a queue, a workflow engine, a manager-in-disguise. All five, designed together, are the minimum load-bearing structure.
+A system is stigmergic if and only if it has all six of these. Miss one and you have something else — a knowledge base, a queue, a workflow engine, a manager-in-disguise. All six, designed together, are the minimum load-bearing structure.
+
+(An earlier version of this document listed five primitives and conflated *who is acting* with *what function is being enacted*. That was wrong. Biology separates them — an ant has a fixed identity and performs different functions over time — and so do we. **Agent** is now its own primitive, distinct from **Role**.)
 
 This document is the spec. The reference implementation in `src/` should correspond 1:1 to the primitives below.
 
@@ -83,7 +85,40 @@ A given Stigmergy system may define arbitrarily many roles beyond these three. T
 
 ---
 
-## 4. Locality
+## 4. Agent
+
+**The identity that enacts roles. Distinct from the role it's enacting.**
+
+Roles describe functions. Agents are who perform them. In biology, one ant has a fixed genome and morphology but performs different functions over its lifetime — nurse, food-processor, forager. This is called **polyethism**, and it is the default pattern in social-insect colonies.
+
+For LLM agents, the same split matters. An agent has persistent identity (personality, values, voice), persistent capabilities (tools, skills), and accumulated learnings (memory). At any given tick, it selects which of its roles to enact based on what the medium shows.
+
+### Requirements
+
+- An Agent has a stable `id`. Every deposit it makes is stamped with that id.
+- An Agent has a declared set of roles it is capable of enacting.
+- An Agent may have identity documents attached: a **SOUL** (persona/values), one or more **SKILLs** (capabilities), a **MEMORY** (consolidated learnings). See `docs/files.md` for the convention.
+- Agents do not reference each other. An Agent knows its roles, its identity documents, and nothing else about the colony's composition.
+
+### Selection, not composition
+
+Multi-role agents select which role to enact at each tick — they do not enact several simultaneously. This preserves locality: when an agent is acting as Scout, it sees only ScoutRole's slice; when it switches to Worker, only WorkerRole's. The agent is never looking at the whole medium at once.
+
+This mirrors polyethism: an ant does one task at a time, but transitions freely.
+
+### Why this is a primitive
+
+Because Agent and Role answer different questions. Role says "what function is happening." Agent says "who is doing it." They have independent lifecycles — a role is a framework-level declaration, an agent is a runtime entity with memory that accumulates.
+
+Collapsing them (as the earlier five-primitive draft did) forces one of two bad choices: either every change of function requires a new agent (no polyethism), or agents accumulate every possible role's state at once (no locality). Splitting them cleanly resolves both.
+
+### Anti-pattern
+
+"Agents can message each other directly to coordinate." No. An Agent knows its roles and its own identity. Coordination is mediated by signals in the medium — never by direct reference.
+
+---
+
+## 5. Locality
 
 **Agents see only what they need to see.**
 
@@ -105,7 +140,7 @@ Locality is a coordination mechanism, not a privacy mechanism. It is the constra
 
 ---
 
-## 5. Validated reinforcement
+## 6. Validated reinforcement
 
 **Not every trace reinforces equally. Successful outcomes deposit more signal than mere activity.**
 
@@ -131,7 +166,7 @@ Once thresholds are known (e.g., "conversion rate > 15% means the signal is vali
 
 ---
 
-## Dual-channel signals (a note, not a sixth primitive)
+## Dual-channel signals (a note, not a seventh primitive)
 
 Paul Welty's framing — **quantitative** and **qualitative** stigmergy working in parallel — is load-bearing for LLM agents specifically, because LLM-native output is language, which is qualitative by default.
 
@@ -145,10 +180,12 @@ The reference implementation treats this as a schema convention: quantitative si
 
 The reference `stigmergy` library must expose:
 
-- `defineMedium(connection)` — open a connection to the medium substrate.
+- `defineMedium({ url, charter? })` — open a connection to the medium substrate; optionally attach a colony-level charter.
 - `defineSignal({ type, decay, shape })` — register a signal type. Rejected if decay is missing.
 - `defineRole({ name, reads, writes, localQuery })` — register a role with its local-query bounds enforced.
-- `defineValidator({ triggers, rule })` — register a validation rule.
-- `run(role, handler)` — start an agent loop for a role.
+- `defineAgent({ id, roles, soul?, skills?, memory? })` — register an agent and its identity documents.
+- `defineValidator({ triggers, validate })` — register a validation rule.
+- `run(agent, handler)` — start an agent loop. The handler selects which role to enact at each tick.
+- `updateValidator(validator, nextValidate)` — hot-swap a validator's rule without restarting the colony.
 
 That's the minimum surface. Everything else is opinion.

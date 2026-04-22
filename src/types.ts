@@ -1,11 +1,15 @@
 /**
- * Stigmergy — Phase 0 type sketch.
+ * Stigmergy — Phase 0 type sketch (revision 2).
  *
  * No runtime. No implementation. Types only. These interfaces define the
  * surface a developer of a Stigmergy colony writes against.
  *
  * See docs/primitives.md for the spec these interfaces implement, and
  * docs/api-sketch.md for a worked example of how they compose.
+ *
+ * Primitives modeled:
+ *   Medium, Signal, Decay, Role, Agent, Validator.
+ *   Locality is enforced through Role's localQuery field.
  */
 
 import type { z } from "zod";
@@ -27,35 +31,22 @@ export type Duration = `${number}${"s" | "m" | "h" | "d"}`;
 
 /**
  * How a signal fades over time. Every signal type must declare one.
- * There is no valid Stigmergy schema without a decay story — the type
- * system makes this structural, not a runtime check.
+ * The type system makes this structural, not a runtime check.
  */
 export type Decay =
-  /**
-   * Signal disappears when `after` elapses since its creation (or last
-   * reinforcement). Binary — the signal is visible or it isn't.
-   *
-   * Use for: claims, task states, ephemeral notes.
-   */
+  /** Binary visibility. Signal disappears after `after` has elapsed. */
   | { kind: "expiry"; after: Duration }
   /**
-   * Signal has a numeric `strength` that is multiplied by `factor` every
-   * `period`. Below `floor` the signal is invisible to readers.
-   *
-   * Use for: quantitative pheromones — demand signal, priority, preference.
+   * Numeric strength, multiplied by `factor` every `period`.
+   * Below `floor`, the signal is invisible.
    */
   | {
       kind: "strength";
-      factor: number;        // 0 < factor < 1
+      factor: number;
       period: Duration;
-      floor?: number;        // default: 0.01
+      floor?: number;
     }
-  /**
-   * Signal's effective strength is the count of validated reinforcements
-   * within the trailing `window`. No reinforcement in the window → invisible.
-   *
-   * Use for: emergent consensus, quality-weighted routing.
-   */
+  /** Effective strength = count of validated reinforcements in `window`. */
   | { kind: "reinforcement"; window: Duration };
 
 // ---------------------------------------------------------------------------
@@ -63,16 +54,10 @@ export type Decay =
 // ---------------------------------------------------------------------------
 
 /**
- * A registered signal type. Produced by `medium.defineSignal(...)`.
- *
- * A signal is quantitative if its decay is `"strength"` (strength is the
- * quantitative channel). A signal is qualitative if its shape includes a
- * `body: string` field (freeform language the next agent renders into
- * context). Both can coexist on the same signal.
- *
- * `TShape` is the Zod schema the developer supplies. The framework adds
- * stable metadata columns (id, created_at, origin_agent, and
- * decay-specific fields like strength / expires_at) around it.
+ * A signal is quantitative if its decay is `"strength"`. A signal is
+ * qualitative if its shape includes a `body: string` field. Both can
+ * coexist on the same signal. The framework does not enforce a tag;
+ * both channels are convention expressed through decay + shape.
  */
 export interface Signal<
   TType extends string = string,
@@ -83,34 +68,20 @@ export interface Signal<
   readonly shape: TShape;
 }
 
-/** Shorthand: extract the payload type from a Signal. */
 export type PayloadOf<S extends Signal> = z.infer<S["shape"]>;
-
-/** Shorthand: extract the type-tag from a Signal. */
 export type TypeOf<S extends Signal> = S["type"];
 
 // ---------------------------------------------------------------------------
 // LocalQuery — data, not a function. This is how Locality is enforced.
 // ---------------------------------------------------------------------------
 
-/**
- * The slice of the medium a Role reads. Data-shaped, not a function —
- * the framework constructs the query, the agent never runs its own.
- * This is what makes locality a type-level guarantee instead of a
- * best-effort convention.
- */
 export interface LocalQuery<TReads extends ReadonlyArray<Signal>> {
-  /** Which signal types this query pulls from. Subset of the role's reads. */
   readonly types: ReadonlyArray<TypeOf<TReads[number]>>;
-  /** Optional filter expression. Small by design — Phase 1 supports eq/gt/lt/and/or. */
   readonly where?: Filter;
-  /** Optional ordering. */
   readonly orderBy?: { field: string; direction: "asc" | "desc" };
-  /** Optional limit. Defaults to an implementation-defined cap. */
   readonly limit?: number;
 }
 
-/** A minimal filter expression tree. Intentionally small. */
 export type Filter =
   | { op: "eq"; field: string; value: unknown }
   | { op: "gt"; field: string; value: number | string }
@@ -119,16 +90,16 @@ export type Filter =
   | { op: "or"; clauses: ReadonlyArray<Filter> };
 
 // ---------------------------------------------------------------------------
-// Role — what an agent reads, writes, and sees.
+// Role — what function is being enacted.
 // ---------------------------------------------------------------------------
 
 /**
- * A role is a bundle of: (a) what signal types the agent reads,
- * (b) what signal types it writes, (c) what local slice it sees.
+ * A role is a *function*, not an identity. It declares what signals are
+ * read, what signals are written, and what slice of the medium is visible
+ * during enactment.
  *
- * Roles do not reference each other. A Role knows only its signals.
- * If two roles need to coordinate, they do it through signals in the
- * medium — never by name.
+ * Roles do not reference each other. They do not know about agents.
+ * An Agent *enacts* a Role; a Role knows only its signals and its slice.
  */
 export interface Role<
   TReads extends ReadonlyArray<Signal> = ReadonlyArray<Signal>,
@@ -141,94 +112,168 @@ export interface Role<
 }
 
 // ---------------------------------------------------------------------------
-// Validator — gates reinforcement.
+// Agent — who is enacting roles. The identity, distinct from the function.
 // ---------------------------------------------------------------------------
 
 /**
- * The outcome of a validator run. Reinforcement changes a signal's
- * strength or expiry — never its content.
+ * An Agent is *who* a colony member is: stable identity, a persona
+ * (soul), a set of capabilities (skills), and accumulated learnings
+ * (memory). An Agent can enact any role in its `roles` set — it selects
+ * which role to play based on what the medium shows.
+ *
+ * Biological analog: an ant has a fixed genome (soul) and morphology
+ * (skills) and learned history (memory), and performs different
+ * functions (roles) over its lifetime as the colony needs shift.
+ *
+ * All three identity documents are optional. A framework consumer can
+ * run Stigmergy with agents that have none — just an id and a role set.
  */
-export type Verdict =
-  | { approve: true; boost?: number; extend?: Duration }
-  | { approve: false; penalty?: number };
+export interface Agent<
+  TRoles extends ReadonlyArray<Role> = ReadonlyArray<Role>
+> {
+  readonly id: string;
+
+  /**
+   * Path or inline markdown for the agent's personality / values /
+   * voice / boundaries. Compatible with the SoulSpec / SOUL.md
+   * convention. Loaded once at run start and exposed on the context.
+   */
+  readonly soul?: string;
+
+  /**
+   * Paths or inline markdown for the agent's capabilities. Compatible
+   * with the agentskills.io SKILL.md convention — progressive disclosure
+   * is the implementation's responsibility.
+   */
+  readonly skills?: ReadonlyArray<string>;
+
+  /**
+   * Path to a consolidated memory file. Read at run start, written at
+   * run end. Memory decays through consolidation (the agent rewrites
+   * it), not through framework-level expiry. Raw events belong in the
+   * medium; MEMORY.md holds distilled lessons.
+   */
+  readonly memory?: string;
+
+  /**
+   * The set of roles this agent is capable of enacting. At each tick,
+   * the agent's handler selects which role to play.
+   */
+  readonly roles: TRoles;
+}
+
+// ---------------------------------------------------------------------------
+// Validator — gates reinforcement. Framework equivalent of selection pressure.
+// ---------------------------------------------------------------------------
 
 /**
- * A validator watches one or more signal types and, when one appears,
- * produces a Verdict. The backing can be a rule, an LLM call, or a
- * human-in-the-loop (resolving the promise from an external webhook).
- * The framework does not care — the shape is uniform.
+ * A verdict is applied to a signal — by default, the triggering signal.
+ * Validators may direct a boost or penalty at a different signal by
+ * setting `target` to its id; the validator is responsible for looking
+ * that signal up via its ValidatorContext.
  */
+export type Verdict =
+  | { approve: true; boost?: number; extend?: Duration; target?: string }
+  | { approve: false; penalty?: number; target?: string };
+
+/**
+ * A limited read surface for validators. Validators are not roles and
+ * do not declare a localQuery, but they need read access to decide
+ * verdicts and to locate target signals for cross-signal reinforcement.
+ */
+export interface ValidatorContext {
+  find<S extends Signal>(
+    type: TypeOf<S>,
+    where?: Filter
+  ): Promise<ReadonlyArray<DepositedSignal<S>>>;
+}
+
 export interface Validator<
   TTriggers extends ReadonlyArray<Signal> = ReadonlyArray<Signal>
 > {
   readonly triggers: TTriggers;
-  validate(signal: DepositedSignal<TTriggers[number]>): Promise<Verdict>;
+  validate(
+    signal: DepositedSignal<TTriggers[number]>,
+    ctx: ValidatorContext
+  ): Promise<Verdict>;
 }
 
 // ---------------------------------------------------------------------------
-// DepositedSignal — what validators and handlers actually see.
+// DepositedSignal — what handlers and validators actually see.
 // ---------------------------------------------------------------------------
 
-/**
- * A signal as it exists in the medium — the developer's payload plus
- * framework-managed metadata. This is what `ctx.view()` returns and
- * what validators receive.
- */
 export interface DepositedSignal<S extends Signal = Signal> {
   readonly id: string;
   readonly type: TypeOf<S>;
   readonly payload: PayloadOf<S>;
   readonly createdAt: Date;
   readonly originAgentId: string;
-  /** Present when the signal's decay is "strength". */
+  /** Present when the signal's decay is `"strength"`. */
   readonly strength?: number;
-  /** Present when the signal's decay is "expiry". */
+  /** Present when the signal's decay is `"expiry"`. */
   readonly expiresAt?: Date;
 }
 
 // ---------------------------------------------------------------------------
-// AgentContext — the *only* surface an agent handler sees.
+// Contexts — what a running agent can actually do.
 // ---------------------------------------------------------------------------
 
 /**
- * What a running agent can do. Crucially: there is no `ctx.medium`.
- * The handler cannot reach beyond its localQuery or its declared
- * writes. This is a type-level guarantee.
+ * The per-role surface an agent gets when it narrows into a role via
+ * `ctx.as(role)`. Reads and writes are constrained to that role's
+ * signals; locality is enforced by the role's localQuery.
  */
-export interface AgentContext<R extends Role> {
-  /** Read the role's local slice. Returns the current matching signals. */
+export interface RoleContext<R extends Role> {
   view(): Promise<ReadonlyArray<DepositedSignal<R["reads"][number]>>>;
 
-  /**
-   * Write a signal of a declared-writable type. Any type not in
-   * `role.writes` is a type error, not a runtime error.
-   */
   deposit<T extends R["writes"][number]>(
     type: TypeOf<T>,
     payload: PayloadOf<T>
   ): Promise<DepositedSignal<T>>;
 
-  /**
-   * Atomically claim a signal. Returns true if acquired, false if
-   * another agent got there first. Claim state lives in the signal's
-   * shape (fields like `claimed_by`, `claimed_until`); this method
-   * is only the safe conditional write.
-   *
-   * `until` can outlive the agent's run — a crashed agent's claim
-   * evaporates when `until` passes, not when the process dies.
-   */
   tryClaim(signalId: string, opts: { until: Duration }): Promise<boolean>;
-
-  /** Release a claim this agent holds. No-op if the claim is not yours. */
   release(signalId: string): Promise<void>;
-
-  /** The agent's own stable identifier. Stamped on every deposit. */
-  readonly agentId: string;
 }
 
-/** The function a developer writes to define agent behavior. */
-export type AgentHandler<R extends Role> = (
-  ctx: AgentContext<R>
+/**
+ * The top-level surface an agent's handler sees. It exposes loaded
+ * identity documents and a `.as(role)` narrowing operation. Crucially:
+ * no `ctx.medium`, no unbounded read, no cross-agent messaging. The
+ * agent's surface is bounded by its roles.
+ */
+export interface AgentContext<A extends Agent<ReadonlyArray<Role>>> {
+  readonly agentId: string;
+
+  /** Loaded content of the agent's soul file, if declared. */
+  readonly soul?: string;
+
+  /** Loaded content of the agent's skill files, keyed by skill name. */
+  readonly skills: Readonly<Record<string, string>>;
+
+  /** Loaded content of the agent's memory file, if declared. */
+  readonly memory?: string;
+
+  /** Loaded content of the medium's charter file, if declared. */
+  readonly charter?: string;
+
+  /**
+   * Narrow the context to one of the agent's roles. This is the only
+   * way to read or write signals. Picking a role mid-handler is the
+   * polyethism analog — the agent decides which function to enact
+   * based on what the medium shows.
+   */
+  as<R extends A["roles"][number]>(role: R): RoleContext<R>;
+
+  /**
+   * Write a consolidated memory summary. Replaces the current
+   * MEMORY.md content. The agent is expected to distill rather than
+   * stream — this is a consolidation pass, not a log append.
+   */
+  writeMemory(text: string): Promise<void>;
+}
+
+export type AgentHandler<A extends Agent<ReadonlyArray<Role>>> = (
+  ctx: AgentContext<A>
 ) => Promise<void>;
 
 // ---------------------------------------------------------------------------
@@ -236,29 +281,18 @@ export type AgentHandler<R extends Role> = (
 // ---------------------------------------------------------------------------
 
 /**
- * A handle to the Stigmergy substrate. In Phase 1, this is a Postgres
- * connection. The Medium owns the registry of signal types, roles, and
- * validators — there is no global mutable state.
- *
- * The Medium's type parameter accumulates registered signals so that
- * later `defineRole` calls can constrain `reads`/`writes` to signals
- * this medium actually knows about.
+ * A handle to the Stigmergy substrate. Owns the registry of signals,
+ * roles, validators, and agents. The Medium's type parameter
+ * accumulates registered signals so later declarations can constrain
+ * against what this medium knows about.
  */
 export interface Medium<
   TSignals extends ReadonlyArray<Signal> = ReadonlyArray<Signal>
 > {
-  /**
-   * Register a signal type. Rejected at the type level if `decay` is
-   * missing — that's the point of Stigmergy.
-   */
   defineSignal<TType extends string, TShape extends z.ZodTypeAny>(
     def: Signal<TType, TShape>
   ): Medium<readonly [...TSignals, Signal<TType, TShape>]>;
 
-  /**
-   * Register a role. `reads` and `writes` must be signals previously
-   * registered on this medium.
-   */
   defineRole<
     TReads extends ReadonlyArray<TSignals[number]>,
     TWrites extends ReadonlyArray<TSignals[number]>
@@ -266,18 +300,42 @@ export interface Medium<
     def: Role<TReads, TWrites>
   ): Role<TReads, TWrites>;
 
-  /** Register a validator for one or more signal types. */
   defineValidator<TTriggers extends ReadonlyArray<TSignals[number]>>(
     def: Validator<TTriggers>
   ): Validator<TTriggers>;
 
-  /** Start an agent loop for a role. The handler is invoked on a schedule. */
-  run<R extends Role>(role: R, handler: AgentHandler<R>): Promise<void>;
+  /**
+   * Register an agent. `roles` must be roles previously registered on
+   * this medium. Identity documents (soul, skills, memory) are loaded
+   * when `run` is invoked, not at definition time.
+   */
+  defineAgent<TRoles extends ReadonlyArray<Role>>(
+    def: Agent<TRoles>
+  ): Agent<TRoles>;
 
   /**
-   * Developer escape hatch for inspection only. Returns raw rows across
-   * the medium — not available inside agent handlers. Use for debugging,
-   * dashboards, and tests. Agents use `ctx.view()`, not this.
+   * Start an agent loop. The handler is invoked on a schedule (Phase 1
+   * will specify cadence and LISTEN/NOTIFY semantics).
+   */
+  run<A extends Agent<ReadonlyArray<Role>>>(
+    agent: A,
+    handler: AgentHandler<A>
+  ): Promise<void>;
+
+  /**
+   * Hot-swap a validator's rule without restarting the colony. The
+   * next triggering signal sees the new rule; existing signals keep
+   * their current strength and decay under the new regime.
+   */
+  updateValidator<V extends Validator>(
+    validator: V,
+    nextValidate: V["validate"]
+  ): void;
+
+  /**
+   * Developer escape hatch for inspection only. Raw read across the
+   * medium, unavailable inside agent handlers. Use for debugging,
+   * dashboards, and tests.
    */
   query(sql: string): Promise<ReadonlyArray<Record<string, unknown>>>;
 }
@@ -287,10 +345,11 @@ export interface Medium<
 // ---------------------------------------------------------------------------
 
 /**
- * Open a Stigmergy medium. In Phase 1, `connection` is a Postgres URL
- * or a pg client. Returns an empty registry — nothing is registered
- * until you call `defineSignal`, `defineRole`, `defineValidator`.
+ * Open a Stigmergy medium. In Phase 1, `connection.url` is a Postgres
+ * URL. `charter` is an optional path or inline markdown describing the
+ * colony's shared mission — loaded and exposed on every agent's context.
  */
 export declare function defineMedium(connection: {
   url: string;
+  charter?: string;
 }): Medium<readonly []>;
