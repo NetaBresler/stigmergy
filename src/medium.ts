@@ -7,9 +7,12 @@ import { postgresJsClient } from "./adapters/postgres.js";
 import { decayColumnsDDL, decayInsertValues } from "./decay.js";
 import { loadMarkdown } from "./files.js";
 import { migrate as runMigrations } from "./migrator.js";
+import { runAgent } from "./runtime.js";
 import { shapeHash, shapeToColumns } from "./shape.js";
 import { quoteIdent } from "./sql.js";
 import type { Agent, Decay, Medium, MediumClient, Role, Signal, Validator } from "./types.js";
+import type { DispatcherHandle } from "./validator.js";
+import { createValidatorDispatcher } from "./validator.js";
 
 /**
  * Runtime side of the Medium primitive. Owns:
@@ -38,7 +41,7 @@ import type { Agent, Decay, Medium, MediumClient, Role, Signal, Validator } from
 // Internal state
 // ---------------------------------------------------------------------------
 
-interface MediumState {
+export interface MediumState {
   readonly client: MediumClient;
   readonly ownsClient: boolean;
   readonly signals: Map<string, Signal>;
@@ -48,6 +51,8 @@ interface MediumState {
   readonly charterPathOrInline?: string;
   charter?: string;
   closed: boolean;
+  /** Singleton validator dispatcher; started on first run(). */
+  validatorDispatcher?: DispatcherHandle;
 }
 
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
@@ -169,8 +174,8 @@ function buildMedium(state: MediumState): Medium {
       }
     },
 
-    async run(_agent, _handler) {
-      throw new Error("Medium.run() is not implemented yet — lands in Phase 1.8.");
+    async run(agent, handler) {
+      await runAgent(medium, agent, handler);
     },
 
     updateValidator(validator, nextValidate) {
@@ -191,6 +196,9 @@ function buildMedium(state: MediumState): Medium {
     async close() {
       if (state.closed) return;
       state.closed = true;
+      if (state.validatorDispatcher) {
+        await state.validatorDispatcher.stop();
+      }
       if (state.ownsClient && state.client.close) {
         await state.client.close();
       }
@@ -321,6 +329,27 @@ export async function upsertAgentId(client: MediumClient, agentId: string): Prom
 export function resolvedCharter(medium: Medium): string | undefined {
   const state = mediumStates.get(medium);
   return state?.charter;
+}
+
+/**
+ * Expose the full MediumState to sibling runtime modules. Internal —
+ * not re-exported from src/index.ts. Kept out of the public Medium
+ * interface to avoid leaking the state shape.
+ */
+export function mediumState(medium: Medium): MediumState | undefined {
+  return mediumStates.get(medium);
+}
+
+/**
+ * Start the validator dispatcher on first demand. No-op on subsequent
+ * calls. Called by runAgent() the first time an agent runs.
+ */
+export function startValidatorDispatcherIfNeeded(medium: Medium): void {
+  const state = mediumStates.get(medium);
+  if (!state) return;
+  if (state.validatorDispatcher) return;
+  state.validatorDispatcher = createValidatorDispatcher(state.client, state.validators);
+  state.validatorDispatcher.start();
 }
 
 /**

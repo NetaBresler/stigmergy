@@ -180,13 +180,15 @@ function compileFilter(
     case "gt":
     case "lt": {
       const lhs = compileFieldRef(filter.field, signal, decayCtx);
+      // `eq` against null renders as `IS NULL` and consumes no param slot.
+      // Everything else takes one positional placeholder.
+      if (filter.op === "eq" && filter.value === null) {
+        return `${lhs} IS NULL`;
+      }
       counter.n += 1;
       const placeholder = `$${counter.n}`;
       params.push(filter.value);
-      if (filter.op === "eq") {
-        if (filter.value === null) return `${lhs} IS NULL`;
-        return `${lhs} = ${placeholder}`;
-      }
+      if (filter.op === "eq") return `${lhs} = ${placeholder}`;
       return `${lhs} ${filter.op === "gt" ? ">" : "<"} ${placeholder}`;
     }
   }

@@ -5,16 +5,20 @@ import { readFile, writeFile } from "node:fs/promises";
  * SKILL, MEMORY). Pure file I/O; no interpretation of the markdown
  * content. Stigmergy hands text to the LLM — it does not parse it.
  *
- * Path-or-inline heuristic: if the source string contains a newline,
- * treat it as inline markdown. Otherwise, treat it as a filesystem
- * path and read the file. This covers the common cases:
+ * Path-or-inline heuristic:
+ *   - Contains a newline               → inline
+ *   - Starts with "# " (md heading)    → inline
+ *   - Starts with "---" (YAML front)   → inline
+ *   - Longer than 1000 chars           → inline
+ *   - Otherwise                        → path
  *
- *   defineAgent({ soul: "./agents/scout/SOUL.md" })   // path
- *   defineAgent({ soul: "# Scout\n\nCurious..." })    // inline
+ * This covers the common cases:
+ *   defineMedium({ charter: "./CHARTER.md" })               // path
+ *   defineMedium({ charter: "# Mission\n..." })             // inline
+ *   defineMedium({ charter: "# One-line mission" })         // inline (starts #)
  *
- * An inline string without a newline is rare and ambiguous; callers
- * wanting that should add a trailing "\n". The heuristic is
- * documented; an explicit discriminator can land if it proves needed.
+ * A rare edge case — e.g., a path named "# something" — will be
+ * misclassified. In practice paths don't start with markdown syntax.
  */
 
 export type LoadedDoc =
@@ -22,7 +26,11 @@ export type LoadedDoc =
   | { readonly origin: "inline"; readonly text: string };
 
 function looksLikePath(source: string): boolean {
-  return !source.includes("\n") && source.length <= 1000;
+  if (source.includes("\n")) return false;
+  if (source.length > 1000) return false;
+  if (source.startsWith("# ")) return false;
+  if (source.startsWith("---")) return false;
+  return true;
 }
 
 /**
