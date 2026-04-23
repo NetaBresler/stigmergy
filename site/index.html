@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stigmergy — coordinate LLM agents through a shared medium, not a manager</title>
+  <meta name="description" content="Stigmergy is a framework for coordinating LLM agents through a shared environment with decay, not through a manager. Six primitives. Postgres-backed. MIT." />
+  <meta property="og:title" content="Stigmergy" />
+  <meta property="og:description" content="Coordinate LLM agents through a shared medium with decay — not a manager." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='28'%3E%F0%9F%90%9C%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <canvas id="pheromone-field" aria-hidden="true"></canvas>
+
+  <header class="nav">
+    <a class="brand" href="#top">
+      <span class="brand-mark">∴</span>
+      <span class="brand-name">Stigmergy</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#idea">Idea</a>
+      <a href="#primitives">Primitives</a>
+      <a href="#compare">Compared</a>
+      <a href="#start">Get started</a>
+      <a href="#reading">Reading</a>
+      <a class="nav-cta" href="https://github.com/NetaBresler/stigmergy" target="_blank" rel="noopener">GitHub →</a>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-inner">
+        <p class="eyebrow">A framework for agent colonies</p>
+        <h1>
+          Stop managing your agents.<br />
+          <span class="accent">Shape the landscape they walk on.</span>
+        </h1>
+        <p class="lede">
+          Stigmergy is a framework for coordinating LLM agents through a
+          <strong>shared medium with decay</strong> — not through a manager.
+          It's how termite mounds get built without blueprints, and it's the
+          coordination pattern ant colonies have been running for two hundred
+          million years.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#start">Install</a>
+          <a class="btn btn-ghost" href="https://github.com/NetaBresler/stigmergy/blob/main/PHILOSOPHY.md" target="_blank" rel="noopener">Read the thesis →</a>
+        </div>
+        <p class="status">
+          <span class="dot"></span>
+          Phase 1 complete · reference implementation runs · 86 tests pass · not yet on npm
+        </p>
+      </div>
+    </section>
+
+    <!-- PROBLEM -->
+    <section class="section bg-panel" id="idea">
+      <div class="container two-col">
+        <div>
+          <h2 class="section-title">The bug in how we build agent teams</h2>
+          <p>
+            CrewAI. AutoGen. OpenAI Swarm. Claude Agent Teams. Almost every
+            multi-agent framework shipping today encodes the same assumption:
+            if you want many agents to work together, give them a manager.
+          </p>
+          <p>
+            This isn't architecture. It's <em>cargo-culting the org chart</em>
+            — we saw how humans coordinate and made the LLMs wear suits.
+          </p>
+          <p>
+            The pattern plateaus for a predictable reason. The manager's
+            context window is the bottleneck. Every decision passes through
+            it. Every worker's output is re-read and re-summarized. Token
+            cost grows superlinearly. Latency compounds. The manager's
+            attention is the ceiling on the team's intelligence.
+          </p>
+        </div>
+        <div>
+          <h2 class="section-title">There is another way</h2>
+          <p>
+            In 1959, the French biologist Pierre-Paul Grassé watched termites
+            rebuild a damaged nest and noticed they weren't talking to each
+            other. They were coordinating with <strong>the nest</strong>. Each
+            deposit of pheromone-laced mud changed the environment in a way
+            that suggested the next deposit to whoever showed up next.
+          </p>
+          <p>
+            He called it <strong>stigmergy</strong> — from Greek
+            <em>stigma</em> (mark) and <em>ergon</em> (work). <em>Work that
+            guides work.</em>
+          </p>
+          <p>
+            Agents read from a database, deposit signals as they work, and
+            the next agent picks up whatever the medium suggests it should
+            do next. Stale signals decay automatically, so the colony forgets
+            plans that aren't working. Specialization emerges from the
+            pressure landscape instead of being assigned by a planner.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- WINS -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title centered">Why this beats hierarchy</h2>
+        <div class="wins">
+          <div class="win">
+            <div class="win-num">01</div>
+            <h3>Coordination cost stops scaling with team size</h3>
+            <p>Adding a tenth agent means one more reader of the medium. Linear scaling instead of quadratic.</p>
+          </div>
+          <div class="win">
+            <div class="win-num">02</div>
+            <h3>No single point of failure</h3>
+            <p>Kill a worker and its unfinished work stays visible. The next agent picks it up. Crashes are recoverable by default.</p>
+          </div>
+          <div class="win">
+            <div class="win-num">03</div>
+            <h3>Specialization emerges</h3>
+            <p>Agents self-select work based on what the medium needs — not on what a planner decides from a stale context window.</p>
+          </div>
+          <div class="win">
+            <div class="win-num">04</div>
+            <h3>Forgetting is built in</h3>
+            <p>Pheromones evaporate. Stale plans die automatically. You don't need a "reconsider the strategy" step.</p>
+          </div>
+          <div class="win">
+            <div class="win-num">05</div>
+            <h3>The medium holds more than a context window</h3>
+            <p>A Postgres table can hold millions of signals. No agent ever needs to see all of them at once.</p>
+          </div>
+          <div class="win win-muted">
+            <div class="win-num">∴</div>
+            <h3>And the catch</h3>
+            <p>If the task is single-threaded reasoning, stigmergy adds nothing. It pays off when there's genuine parallelism.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRIMITIVES -->
+    <section class="section bg-panel" id="primitives">
+      <div class="container">
+        <h2 class="section-title centered">The six primitives</h2>
+        <p class="section-sub centered">
+          A system is stigmergic if and only if it has all six. Miss one and
+          you have something else — a knowledge base, a queue, a workflow
+          engine, or a manager-in-disguise.
+        </p>
+
+        <div class="primitives">
+          <article class="primitive">
+            <div class="primitive-head"><span class="primitive-num">1</span><h3>Medium</h3></div>
+            <p>The one place agents read from and write to. The <em>only</em> legitimate coordination channel. Reference implementation: Postgres.</p>
+            <p class="primitive-anti"><strong>Anti-pattern:</strong> a message bus. Signals flow through instead of being deposited — nothing to decay, nothing to persist.</p>
+          </article>
+
+          <article class="primitive">
+            <div class="primitive-head"><span class="primitive-num">2</span><h3>Decay</h3></div>
+            <p>Every signal evaporates unless reinforced. Three supported mechanisms: explicit expiry, strength decay, reinforcement-only. The framework refuses to register a signal type without one.</p>
+            <p class="primitive-anti"><strong>Anti-pattern:</strong> "we'll add decay later." Stigmergy without decay is just a shared database.</p>
+          </article>
+
+          <article class="primitive">
+            <div class="primitive-head"><span class="primitive-num">3</span><h3>Role specialization</h3></div>
+            <p>A role bundles: what signals the agent reads, what it writes, what its local query looks like. Roles don't reference each other — only signals.</p>
+            <p class="primitive-anti"><strong>Anti-pattern:</strong> a Supervisor role that reads everything. That's a manager. Delete it.</p>
+          </article>
+
+          <article class="primitive">
+            <div class="primitive-head"><span class="primitive-num">4</span><h3>Agent</h3></div>
+            <p>The identity that enacts roles — distinct from the role it's enacting. Stable id, persistent identity documents (soul, skills, memory), selects which role to play each tick. <em>Polyethism.</em></p>
+            <p class="primitive-anti"><strong>Anti-pattern:</strong> agents messaging each other directly. Coordination is mediated by signals. Always.</p>
+          </article>
+
+          <article class="primitive">
+            <div class="primitive-head"><span class="primitive-num">5</span><h3>Locality</h3></div>
+            <p>Every role declares a local query — the slice of the medium it can read. The framework enforces it. You cannot micro-manage what you cannot see.</p>
+            <p class="primitive-anti"><strong>Anti-pattern:</strong> "the Worker also needs to see the Validator queue." No. If it needs info, a signal carries it.</p>
+          </article>
+
+          <article class="primitive">
+            <div class="primitive-head"><span class="primitive-num">6</span><h3>Validated reinforcement</h3></div>
+            <p>Not every trace reinforces equally. Reinforcement is a distinct operation from deposition, and changes strength / expiry / visibility — never content. Rule-based, agent-based, or human-in-the-loop.</p>
+            <p class="primitive-anti"><strong>Anti-pattern:</strong> every signal starts at full strength. Whoever runs first wins, regardless of quality.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPARE -->
+    <section class="section" id="compare">
+      <div class="container">
+        <h2 class="section-title centered">How this differs from what's shipping</h2>
+        <div class="table-wrap">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>LangGraph / CrewAI / AutoGen</th>
+                <th>Claude Agent Teams</th>
+                <th>Stigmergy</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Coordinator</th>
+                <td>Graph / crew lead / conversation manager</td>
+                <td>Team-lead session</td>
+                <td class="accent-cell">None. The medium coordinates.</td>
+              </tr>
+              <tr>
+                <th scope="row">Scaling cost</th>
+                <td>Super-linear in team size</td>
+                <td>Bounded by lead's context</td>
+                <td class="accent-cell">Linear — each agent adds one reader</td>
+              </tr>
+              <tr>
+                <th scope="row">Failure mode</th>
+                <td>Manager crash halts team</td>
+                <td>Lead crash halts team</td>
+                <td class="accent-cell">Worker crashes are recoverable</td>
+              </tr>
+              <tr>
+                <th scope="row">Memory</th>
+                <td>In-context, re-serialized per handoff</td>
+                <td>In-context, per session</td>
+                <td class="accent-cell">In the medium. Inspectable by SQL.</td>
+              </tr>
+              <tr>
+                <th scope="row">Forgetting</th>
+                <td>Explicit (prune / re-plan)</td>
+                <td>Explicit</td>
+                <td class="accent-cell">Built in. Decay is a primitive.</td>
+              </tr>
+              <tr>
+                <th scope="row">Specialization</th>
+                <td>Assigned by planner</td>
+                <td>Assigned by lead</td>
+                <td class="accent-cell">Emerges from pressure</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine-print centered">
+          All of those are perfectly good for small, single-threaded teams.
+          Stigmergy is the alternative for when your colony has real
+          parallelism.
+        </p>
+      </div>
+    </section>
+
+    <!-- GET STARTED -->
+    <section class="section bg-panel" id="start">
+      <div class="container">
+        <h2 class="section-title centered">Get started in three commands</h2>
+        <p class="section-sub centered">
+          Node 22+. Postgres is the default substrate;
+          <a href="https://github.com/electric-sql/pglite" target="_blank" rel="noopener">PGlite</a>
+          works in-process for tests and demos, no server required.
+        </p>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-head"><span class="step-num">1</span><h3>Install</h3></div>
+            <p>Stigmergy isn't on npm yet — it installs directly from GitHub while we wait for its first real user (Phase 2).</p>
+            <pre><code>npm install github:NetaBresler/stigmergy</code></pre>
+          </div>
+
+          <div class="step">
+            <div class="step-head"><span class="step-num">2</span><h3>Run the worked example</h3></div>
+            <p>A three-agent colony — Scout, Worker, Validator — that deposits signals, competes for claims, and reinforces the winning pheromones while the weak ones decay.</p>
+            <pre><code>git clone https://github.com/NetaBresler/stigmergy
+cd stigmergy
+npm install
+npx tsx examples/niche-discovery.ts</code></pre>
+          </div>
+
+          <div class="step">
+            <div class="step-head"><span class="step-num">3</span><h3>Define your own colony</h3></div>
+            <p>Six functions. Everything else is opinion.</p>
+<pre><code><span class="hl-k">import</span> {
+  defineMedium, defineSignal, defineRole,
+  defineAgent, defineValidator, run,
+} <span class="hl-k">from</span> <span class="hl-s">"stigmergy"</span>;
+
+<span class="hl-k">const</span> medium = <span class="hl-f">defineMedium</span>({ url: <span class="hl-v">process.env.DATABASE_URL</span> });
+
+<span class="hl-f">defineSignal</span>({
+  type: <span class="hl-s">"candidate"</span>,
+  decay: { kind: <span class="hl-s">"strength"</span>, halfLifeHours: <span class="hl-n">6</span> },
+  shape: { body: <span class="hl-s">"text"</span>, priority: <span class="hl-s">"number"</span> },
+});
+
+<span class="hl-f">defineRole</span>({
+  name: <span class="hl-s">"worker"</span>,
+  reads:  [<span class="hl-s">"candidate"</span>],
+  writes: [<span class="hl-s">"result"</span>],
+  localQuery: { type: <span class="hl-s">"candidate"</span>, orderBy: <span class="hl-s">"strength"</span>, limit: <span class="hl-n">1</span> },
+});
+
+<span class="hl-f">run</span>(agent, <span class="hl-k">async</span> (ctx) =&gt; {
+  <span class="hl-k">const</span> [candidate] = <span class="hl-k">await</span> ctx.<span class="hl-f">read</span>(<span class="hl-s">"candidate"</span>);
+  <span class="hl-k">if</span> (!candidate) <span class="hl-k">return</span>;
+  <span class="hl-k">await</span> ctx.<span class="hl-f">deposit</span>(<span class="hl-s">"result"</span>, { body: <span class="hl-k">await</span> <span class="hl-f">process</span>(candidate) });
+});</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NOT A KB -->
+    <section class="section">
+      <div class="container narrow">
+        <h2 class="section-title centered">This is not a knowledge base</h2>
+        <p class="centered section-sub">
+          The sharpest question about stigmergy, and the one most people get
+          wrong the first time.
+        </p>
+        <div class="table-wrap">
+          <table class="compare-table compact">
+            <thead>
+              <tr>
+                <th>Dimension</th>
+                <th>Knowledge base (RAG)</th>
+                <th>Stigmergic medium</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Who writes</th><td>Humans curate; batch</td><td class="accent-cell">Every agent, as it works</td></tr>
+              <tr><th scope="row">Time dimension</th><td>Static until re-indexed</td><td class="accent-cell">Decays; recency encodes priority</td></tr>
+              <tr><th scope="row">What it encodes</th><td>Facts</td><td class="accent-cell">Intent, attention, claim-state</td></tr>
+              <tr><th scope="row">Agent's question</th><td>"What do I need to know?"</td><td class="accent-cell">"What does the colony need next?"</td></tr>
+              <tr><th scope="row">Failure mode</th><td>Stale facts mislead</td><td class="accent-cell">Stale signals decay away</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine-print centered">
+          A knowledge base tells an agent <em>what is true</em>. A medium
+          tells an agent <em>what to do</em>. You want both. They are not
+          substitutes.
+        </p>
+      </div>
+    </section>
+
+    <!-- READING -->
+    <section class="section bg-panel" id="reading">
+      <div class="container">
+        <h2 class="section-title centered">Further reading</h2>
+        <div class="reading">
+          <a class="read-card" href="https://github.com/NetaBresler/stigmergy/blob/main/PHILOSOPHY.md" target="_blank" rel="noopener">
+            <h3>PHILOSOPHY.md</h3>
+            <p>The thesis, in long form. Why hierarchy is a bug, and why decay is the primitive everyone gets wrong.</p>
+          </a>
+          <a class="read-card" href="https://github.com/NetaBresler/stigmergy/blob/main/docs/primitives.md" target="_blank" rel="noopener">
+            <h3>docs/primitives.md</h3>
+            <p>The six primitives as a concrete spec. The reference implementation maps 1:1 to it.</p>
+          </a>
+          <a class="read-card" href="https://github.com/NetaBresler/stigmergy/blob/main/docs/api-sketch.md" target="_blank" rel="noopener">
+            <h3>docs/api-sketch.md</h3>
+            <p>What a full colony looks like in code, end to end.</p>
+          </a>
+          <a class="read-card" href="https://github.com/NetaBresler/stigmergy/blob/main/docs/prior-art.md" target="_blank" rel="noopener">
+            <h3>docs/prior-art.md</h3>
+            <p>SwarmSys, SIER, Ledger-State Stigmergy, Welty, Rodriguez. Where the field is, and the gap we're closing.</p>
+          </a>
+          <a class="read-card" href="https://github.com/NetaBresler/stigmergy/blob/main/docs/roadmap.md" target="_blank" rel="noopener">
+            <h3>docs/roadmap.md</h3>
+            <p>Phase 0 — 3. What's done, what's next, what's deliberately out of scope.</p>
+          </a>
+          <a class="read-card" href="https://github.com/NetaBresler/stigmergy" target="_blank" rel="noopener">
+            <h3>GitHub</h3>
+            <p>The code. MIT-licensed. File an issue or open a PR if something is broken or wrong.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container narrow centered">
+        <h2 class="section-title">The claim</h2>
+        <p class="big-quote">
+          Agent systems that scale will look less like corporations and more
+          like colonies. Not because biology is pretty, but because the math
+          is better: linear coordination cost, no manager bottleneck, graceful
+          failure, automatic forgetting, emergent specialization.
+        </p>
+        <div class="cta-row centered">
+          <a class="btn btn-primary" href="#start">Try it</a>
+          <a class="btn btn-ghost" href="https://github.com/NetaBresler/stigmergy" target="_blank" rel="noopener">Star on GitHub →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span>Stigmergy · MIT · <a href="https://github.com/NetaBresler/stigmergy" target="_blank" rel="noopener">NetaBresler/stigmergy</a></span>
+      <span class="footer-muted">Shape the landscape. Let the colony walk.</span>
+    </div>
+  </footer>
+
+  <script src="./pheromones.js"></script>
+</body>
+</html>
