@@ -164,12 +164,14 @@ export interface Agent<TRoles extends ReadonlyArray<Role> = ReadonlyArray<Role>>
 /**
  * A verdict is applied to a signal — by default, the triggering signal.
  * Validators may direct a boost or penalty at a different signal by
- * setting `target` to its id; the validator is responsible for looking
- * that signal up via its ValidatorContext.
+ * setting `target` to `{ type, id }`; the validator's `ctx.find()` is
+ * the intended way to locate that signal.
  */
+export type VerdictTarget = { readonly type: string; readonly id: string };
+
 export type Verdict =
-  | { approve: true; boost?: number; extend?: Duration; target?: string }
-  | { approve: false; penalty?: number; target?: string };
+  | { approve: true; boost?: number; extend?: Duration; target?: VerdictTarget }
+  | { approve: false; penalty?: number; target?: VerdictTarget };
 
 /**
  * A limited read surface for validators. Validators are not roles and
@@ -184,6 +186,13 @@ export interface ValidatorContext {
 }
 
 export interface Validator<TTriggers extends ReadonlyArray<Signal> = ReadonlyArray<Signal>> {
+  /**
+   * Stable identifier for this validator. Recorded in
+   * `stigmergy_reinforcements.validated_by` so audit logs survive
+   * restarts and multiple validators on the same trigger can be
+   * attributed independently.
+   */
+  readonly name: string;
   readonly triggers: TTriggers;
   validate(signal: DepositedSignal<TTriggers[number]>, ctx: ValidatorContext): Promise<Verdict>;
 }

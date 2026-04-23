@@ -268,6 +268,7 @@ describe("updateValidator hot-swap", () => {
     });
 
     const validator = medium.defineValidator({
+      name: "report_quality",
       triggers: [report],
       async validate() {
         return { approve: true, boost: 1 };
@@ -299,6 +300,7 @@ describe("updateValidator hot-swap", () => {
   it("throws when the validator is not registered on this medium", () => {
     const medium = defineMedium({ client: pgliteClient(db) });
     const rogue: Validator = {
+      name: "rogue",
       triggers: [],
       validate: async (): Promise<Verdict> => ({ approve: true }),
     };
