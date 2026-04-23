@@ -1,19 +1,13 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import type { MediumClient } from "./types.js";
 
 /**
- * A minimal substrate-agnostic client shape for migrations. Both postgres-js
- * and PGlite satisfy this with tiny adapters; see `src/adapters/`. Keeping
- * the interface small means Stigmergy's migrator works against real Postgres
- * in production and against in-process PGlite in tests, with no special
- * casing.
+ * The migrator uses the same minimal DB-client interface as the rest of
+ * Stigmergy. See `MediumClient` in `src/types.ts`. Re-exported here as
+ * `MigrationClient` for readability when migrator tests drive a client.
  */
-export interface MigrationClient {
-  /** Execute SQL that may contain multiple statements. No parameters. */
-  exec(sql: string): Promise<void>;
-  /** Execute a single parameterized statement and return the rows it produced. */
-  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
-}
+export type MigrationClient = MediumClient;
 
 export interface MigrationResult {
   /** Migration filenames applied in this run, in order. Empty when nothing to do. */

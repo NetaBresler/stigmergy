@@ -282,25 +282,29 @@ export type AgentHandler<A extends Agent<ReadonlyArray<Role>>> = (
 
 /**
  * A handle to the Stigmergy substrate. Owns the registry of signals,
- * roles, validators, and agents. The Medium's type parameter
- * accumulates registered signals so later declarations can constrain
- * against what this medium knows about.
+ * roles, validators, and agents.
+ *
+ * (Phase 1 revision: dropped the accumulating `TSignals` type parameter
+ * that the Phase 0 sketch carried. Compile-time "signals must be
+ * registered on this medium" was nice but forced `defineSignal` to return
+ * the Medium instead of the Signal — which breaks the natural idiom
+ * `const pheromone = medium.defineSignal(...); reads: [pheromone]`. The
+ * constraint now lives at runtime: the medium rejects roles or validators
+ * referencing unregistered signals when you `migrate()` or `run()`.)
  */
-export interface Medium<
-  TSignals extends ReadonlyArray<Signal> = ReadonlyArray<Signal>
-> {
+export interface Medium {
   defineSignal<TType extends string, TShape extends z.ZodTypeAny>(
     def: Signal<TType, TShape>
-  ): Medium<readonly [...TSignals, Signal<TType, TShape>]>;
+  ): Signal<TType, TShape>;
 
   defineRole<
-    TReads extends ReadonlyArray<TSignals[number]>,
-    TWrites extends ReadonlyArray<TSignals[number]>
+    TReads extends ReadonlyArray<Signal>,
+    TWrites extends ReadonlyArray<Signal>
   >(
     def: Role<TReads, TWrites>
   ): Role<TReads, TWrites>;
 
-  defineValidator<TTriggers extends ReadonlyArray<TSignals[number]>>(
+  defineValidator<TTriggers extends ReadonlyArray<Signal>>(
     def: Validator<TTriggers>
   ): Validator<TTriggers>;
 
@@ -312,6 +316,15 @@ export interface Medium<
   defineAgent<TRoles extends ReadonlyArray<Role>>(
     def: Agent<TRoles>
   ): Agent<TRoles>;
+
+  /**
+   * Apply framework migrations and create per-signal-type tables from
+   * currently-registered signal definitions. Idempotent. Rejects when
+   * the stored shape hash of a registered signal differs from the code
+   * ("schema drift detected"). Run explicitly — Stigmergy does not
+   * migrate on first deposit.
+   */
+  migrate(): Promise<void>;
 
   /**
    * Start an agent loop. The handler is invoked on a schedule (Phase 1
@@ -338,6 +351,9 @@ export interface Medium<
    * dashboards, and tests.
    */
   query(sql: string): Promise<ReadonlyArray<Record<string, unknown>>>;
+
+  /** Release the underlying connection. Idempotent. */
+  close(): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -345,11 +361,29 @@ export interface Medium<
 // ---------------------------------------------------------------------------
 
 /**
- * Open a Stigmergy medium. In Phase 1, `connection.url` is a Postgres
- * URL. `charter` is an optional path or inline markdown describing the
- * colony's shared mission — loaded and exposed on every agent's context.
+ * A minimal DB client shape sufficient for Stigmergy's operations. Both
+ * postgres-js (production) and PGlite (tests / in-process dev) satisfy
+ * this via tiny adapters in `src/adapters/`.
  */
-export declare function defineMedium(connection: {
-  url: string;
-  charter?: string;
-}): Medium<readonly []>;
+export interface MediumClient {
+  exec(sql: string): Promise<void>;
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
+  close?(): Promise<void>;
+}
+
+/**
+ * Open a Stigmergy medium.
+ *
+ * The common form passes `{ url }` — a Postgres connection string, opened
+ * with postgres-js internally. The `{ client }` form lets callers bring
+ * their own MediumClient (PGlite for tests, a custom pool, pgbouncer).
+ *
+ * `charter` is optional; when provided it's loaded (from path or treated
+ * as inline markdown) and exposed as `ctx.charter` on every agent.
+ */
+export declare function defineMedium(
+  connection: { url: string; charter?: string }
+): Medium;
+export declare function defineMedium(
+  connection: { client: MediumClient; charter?: string }
+): Medium;

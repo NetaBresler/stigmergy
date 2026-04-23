@@ -1,5 +1,4 @@
-import type { Decay, Duration } from "./types.js";
-import type { MigrationClient } from "./migrator.js";
+import type { Decay, Duration, MediumClient } from "./types.js";
 
 /**
  * Decay — the pure-function heart of Stigmergy.
@@ -179,7 +178,7 @@ export interface SweepStats {
  *   - reinforcement: no-op. The audit log is trimmed elsewhere.
  */
 export async function sweepSignal(
-  client: MigrationClient,
+  client: MediumClient,
   signalType: string,
   tableName: string,
   decay: Decay

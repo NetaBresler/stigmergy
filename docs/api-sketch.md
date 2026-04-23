@@ -4,6 +4,14 @@ This walks through what using Stigmergy feels like, end-to-end, in enough detail
 
 No runtime exists yet. Every code block below is aspirational. If the shape feels wrong here, it's wrong, and we change `src/types.ts` before anyone writes implementation code.
 
+## Phase 1 revisions
+
+Three changes to the Phase 0 surface as implementation landed:
+
+- **`medium.migrate()`** — explicit migration step. Apply framework tables and create per-signal-type tables from the currently registered definitions. Idempotent; rejects when a registered signal's stored shape hash no longer matches the code.
+- **`defineMedium({ client })`** — bring-your-own-client overload. The `{ url }` form opens postgres-js internally; `{ client }` accepts any `MediumClient` (PGlite in tests; a pooled connection or pgbouncer in production).
+- **`defineSignal` returns the Signal, not a widened Medium.** The Phase 0 types had `defineSignal` return `Medium<[...signals, newSignal]>` to make "signal must belong to this medium" a compile-time check. In practice that broke the natural idiom `const pheromone = medium.defineSignal(...); defineRole({ reads: [pheromone] })`. The accumulating type parameter has been removed from `Medium`; the constraint now lives at runtime (the medium rejects roles/validators referencing unregistered signals at `migrate()` time).
+
 ---
 
 ## The scenario
