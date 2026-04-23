@@ -5,6 +5,7 @@ import postgres from "postgres";
 import type { z } from "zod";
 import { postgresJsClient } from "./adapters/postgres.js";
 import { decayColumnsDDL, decayInsertValues } from "./decay.js";
+import { loadMarkdown } from "./files.js";
 import { migrate as runMigrations } from "./migrator.js";
 import { shapeHash, shapeToColumns } from "./shape.js";
 import { quoteIdent } from "./sql.js";
@@ -83,6 +84,12 @@ export function defineMedium(
   return buildMedium(state);
 }
 
+// Track state-by-medium so helpers in sibling modules can reach the
+// charter. The mapping is populated inside buildMedium().
+function registerState(medium: Medium, state: MediumState): void {
+  mediumStates.set(medium, state);
+}
+
 // ---------------------------------------------------------------------------
 // Medium object
 // ---------------------------------------------------------------------------
@@ -154,6 +161,12 @@ function buildMedium(state: MediumState): Medium {
       for (const signal of state.signals.values()) {
         await migrateSignal(state.client, signal);
       }
+      // Resolve the charter (path or inline) now, so every agent sees a
+      // consistent value regardless of when its handler fires.
+      if (state.charterPathOrInline !== undefined && state.charter === undefined) {
+        const doc = await loadMarkdown(state.charterPathOrInline);
+        state.charter = doc.text;
+      }
     },
 
     async run(_agent, _handler) {
@@ -184,6 +197,7 @@ function buildMedium(state: MediumState): Medium {
     },
   };
 
+  registerState(medium, state);
   return medium;
 }
 
@@ -300,9 +314,21 @@ export async function upsertAgentId(client: MediumClient, agentId: string): Prom
   );
 }
 
-// ---------------------------------------------------------------------------
-// Internal registry helpers
-// ---------------------------------------------------------------------------
+/**
+ * Expose the resolved charter text (if any). Populated by migrate().
+ * Used by src/agent.ts when building an AgentContext.
+ */
+export function resolvedCharter(medium: Medium): string | undefined {
+  const state = mediumStates.get(medium);
+  return state?.charter;
+}
+
+/**
+ * Framework-internal registry mapping Medium instances to their state.
+ * Lets helpers in sibling modules (agent.ts, runtime.ts in 1.8) reach
+ * the charter and client without threading them through every call.
+ */
+const mediumStates = new WeakMap<Medium, MediumState>();
 
 function assertSignalRegistered(state: MediumState, signal: Signal, context: string): void {
   if (state.signals.get(signal.type) !== signal) {
