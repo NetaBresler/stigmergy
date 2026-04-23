@@ -1,22 +1,14 @@
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import type { z } from "zod";
 import { postgresJsClient } from "./adapters/postgres.js";
 import { decayColumnsDDL, decayInsertValues } from "./decay.js";
 import { migrate as runMigrations } from "./migrator.js";
 import { shapeHash, shapeToColumns } from "./shape.js";
-import type {
-  Agent,
-  AgentHandler,
-  Decay,
-  Medium,
-  MediumClient,
-  Role,
-  Signal,
-  Validator,
-} from "./types.js";
+import { quoteIdent } from "./sql.js";
+import type { Agent, Decay, Medium, MediumClient, Role, Signal, Validator } from "./types.js";
 
 /**
  * Runtime side of the Medium primitive. Owns:
@@ -35,9 +27,10 @@ import type {
  *     it in `stigmergy_signal_registry`, or (b) verifies the stored shape
  *     hash matches the code and refuses to run otherwise.
  *
- * Run, validator dispatch, and the role-enforcement machinery arrive in
- * subsequent steps (1.5–1.8). For now those methods are minimal stubs
- * that preserve the registry but do not yet execute.
+ * Role-context construction is in `src/role.ts`. Run-loop wiring,
+ * validator dispatch, and file-loaded identity documents (charter / soul /
+ * skills / memory) land in subsequent steps (1.6–1.8); `run()` throws
+ * until then.
  */
 
 // ---------------------------------------------------------------------------
@@ -115,6 +108,12 @@ function buildMedium(state: MediumState): Medium {
       }
       for (const s of def.writes) {
         assertSignalRegistered(state, s, `writes of role "${def.name}"`);
+      }
+      if (def.localQuery.types.length !== 1) {
+        throw new Error(
+          `Role "${def.name}" localQuery.types has ${def.localQuery.types.length} entries; ` +
+            `Phase 1 supports exactly one read type per role.`
+        );
       }
       for (const type of def.localQuery.types) {
         if (!def.reads.some((s) => s.type === type)) {
@@ -325,16 +324,3 @@ function validateSignalType(type: string): void {
     );
   }
 }
-
-function quoteIdent(name: string): string {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid identifier: ${JSON.stringify(name)}`);
-  }
-  return `"${name}"`;
-}
-
-// ---------------------------------------------------------------------------
-// Handler type reference (preserves import so ts doesn't strip it)
-// ---------------------------------------------------------------------------
-
-export type { AgentHandler };

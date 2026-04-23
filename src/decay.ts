@@ -1,3 +1,4 @@
+import { quoteIdent, quoteLiteral } from "./sql.js";
 import type { Decay, Duration, MediumClient } from "./types.js";
 
 /**
@@ -209,25 +210,4 @@ export async function sweepSignal(
     case "reinforcement":
       return { signalType, deleted: 0, updated: 0 };
   }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Quote a SQL identifier. Defensive — our signal/table names should already
- *  be alphanumeric+underscore, but this closes the door on accidental
- *  injection from misuse. */
-function quoteIdent(name: string): string {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid identifier: ${JSON.stringify(name)}`);
-  }
-  return `"${name}"`;
-}
-
-/** Quote a SQL string literal. Used for the reinforcement subquery's
- *  signal_type comparison. Signal type strings come from developer code,
- *  not runtime input, but we still escape defensively. */
-function quoteLiteral(s: string): string {
-  return `'${s.replace(/'/g, "''")}'`;
 }

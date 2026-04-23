@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { durationSeconds, effectiveStrengthSQL, visibilityPredicate } from "./decay.js";
 import { depositSignalRow, tableNameFor } from "./medium.js";
+import { quoteIdent, quoteLiteral } from "./sql.js";
 import type {
   DepositedSignal,
   Duration,
@@ -351,15 +352,4 @@ function unpackRow(signal: Signal, row: Record<string, unknown>): DepositedSigna
     (result as { expiresAt?: Date }).expiresAt = row.expires_at as Date;
   }
   return result;
-}
-
-function quoteIdent(name: string): string {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid identifier: ${JSON.stringify(name)}`);
-  }
-  return `"${name}"`;
-}
-
-function quoteLiteral(s: string): string {
-  return `'${s.replace(/'/g, "''")}'`;
 }
