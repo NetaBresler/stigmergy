@@ -4,7 +4,7 @@ A framework for coordinating LLM agents through a shared environment with decay 
 
 ## Status
 
-Early. The thesis is drafted, the primitives are specified, the reference implementation is being designed. Not yet installable. Not yet recommended for production use. Watch this repo.
+Phase 1 complete. The reference implementation runs, 86 tests pass (PGlite + real Postgres), the worked example runs end-to-end, and the docs match the code. **Installable from GitHub; not yet published to npm** — awaiting its first real user (see [Roadmap](docs/roadmap.md) Phase 2). Production-ready is not yet claimed.
 
 ## The 30-second pitch
 
@@ -14,18 +14,41 @@ Stigmergy replaces the manager with a shared medium. Agents read from a database
 
 It's how termite mounds get built without blueprints, and it's the coordination pattern ant colonies have been running for two hundred million years.
 
+## Install
+
+```bash
+npm install github:NetaBresler/stigmergy
+```
+
+The package builds itself on install (via `prepare`). Node 22+. Postgres is the default substrate; [PGlite](https://github.com/electric-sql/pglite) works in-process for tests and demos.
+
+## Quick start
+
+Clone and run the worked example:
+
+```bash
+git clone https://github.com/NetaBresler/stigmergy
+cd stigmergy
+npm install
+npx tsx examples/niche-discovery.ts
+```
+
+You'll see a three-agent colony (Scout, Worker, Validator) deposit signals, compete for claims, and reinforce the winning pheromones while the weak ones decay. See [`examples/README.md`](examples/README.md) for what's happening.
+
 ## Why this exists
 
-Because after surveying what's shipping, we found no production-ready framework that implements stigmergy for LLM agents. There are academic prototypes (SwarmSys, SIER, AntLLM). There are practitioner essays (Welty's "Context as Facticity," Rodriguez's "Why Multi-Agent Systems Don't Need Managers"). There is a formal framework for database-backed stigmergy (Paredes García's Ledger-State Stigmergy). There is no installable, opinionated, documented tool.
+After surveying what's shipping, we found no production-ready framework that implements stigmergy for LLM agents. There are academic prototypes (SwarmSys, SIER, AntLLM). There are practitioner essays (Welty's "Context as Facticity," Rodriguez's "Why Multi-Agent Systems Don't Need Managers"). There is a formal framework for database-backed stigmergy (Paredes García's Ledger-State Stigmergy). There is no installable, opinionated, documented tool.
 
 We're building that tool.
 
 ## Further reading
 
-- `PHILOSOPHY.md` — the thesis.
-- `docs/primitives.md` — the five primitives that make a system stigmergic.
-- `docs/prior-art.md` — what exists, with citations.
-- `docs/roadmap.md` — what we're building, in phases.
+- [`PHILOSOPHY.md`](PHILOSOPHY.md) — the thesis.
+- [`docs/primitives.md`](docs/primitives.md) — the six primitives that make a system stigmergic.
+- [`docs/files.md`](docs/files.md) — the CHARTER / SOUL / SKILL / MEMORY convention.
+- [`docs/api-sketch.md`](docs/api-sketch.md) — what the code looks like end-to-end.
+- [`docs/prior-art.md`](docs/prior-art.md) — what exists, with citations.
+- [`docs/roadmap.md`](docs/roadmap.md) — what we're building, in phases.
 
 ## License
 
