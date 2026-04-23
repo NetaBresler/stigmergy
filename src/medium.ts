@@ -110,11 +110,27 @@ function buildMedium(state: MediumState): Medium {
       if (state.roles.has(def.name)) {
         throw new Error(`Role name "${def.name}" is already defined on this medium.`);
       }
+      for (const s of def.reads) {
+        assertSignalRegistered(state, s, `reads of role "${def.name}"`);
+      }
+      for (const s of def.writes) {
+        assertSignalRegistered(state, s, `writes of role "${def.name}"`);
+      }
+      for (const type of def.localQuery.types) {
+        if (!def.reads.some((s) => s.type === type)) {
+          throw new Error(
+            `Role "${def.name}" localQuery.types references "${type}" which is not in reads`
+          );
+        }
+      }
       state.roles.set(def.name, def);
       return def;
     },
 
     defineValidator(def) {
+      for (const s of def.triggers) {
+        assertSignalRegistered(state, s, `triggers of validator`);
+      }
       state.validators.push(def);
       return def;
     },
@@ -122,6 +138,13 @@ function buildMedium(state: MediumState): Medium {
     defineAgent(def) {
       if (state.agents.has(def.id)) {
         throw new Error(`Agent id "${def.id}" is already defined on this medium.`);
+      }
+      for (const role of def.roles) {
+        if (state.roles.get(role.name) !== role) {
+          throw new Error(
+            `Agent "${def.id}" references role "${role.name}" that is not registered on this medium.`
+          );
+        }
       }
       state.agents.set(def.id, def);
       return def;
@@ -263,6 +286,29 @@ export async function depositSignalRow(
 
 export function tableNameFor(signalType: string): string {
   return `signal_${signalType}`;
+}
+
+/**
+ * Upsert an agent id into `stigmergy_agents`. Called at run-time boot
+ * (step 1.8) and by tests that need the FK target in place before
+ * depositing. Idempotent.
+ */
+export async function upsertAgentId(client: MediumClient, agentId: string): Promise<void> {
+  await client.query(
+    `INSERT INTO stigmergy_agents (id) VALUES ($1)
+     ON CONFLICT (id) DO UPDATE SET last_seen_at = now()`,
+    [agentId]
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Internal registry helpers
+// ---------------------------------------------------------------------------
+
+function assertSignalRegistered(state: MediumState, signal: Signal, context: string): void {
+  if (state.signals.get(signal.type) !== signal) {
+    throw new Error(`Signal "${signal.type}" used in ${context} is not registered on this medium.`);
+  }
 }
 
 // ---------------------------------------------------------------------------
