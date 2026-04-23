@@ -10,10 +10,7 @@ export function postgresJsClient(sql: postgres.Sql): MediumClient {
     async exec(raw: string): Promise<void> {
       await sql.unsafe(raw);
     },
-    async query<T = Record<string, unknown>>(
-      raw: string,
-      params: unknown[] = []
-    ): Promise<T[]> {
+    async query<T = Record<string, unknown>>(raw: string, params: unknown[] = []): Promise<T[]> {
       // postgres-js's sql.unsafe(raw, params) returns a PostgresResult that
       // is iterable as rows. Cast through unknown to our generic row type.
       const rows = await sql.unsafe(raw, params as postgres.ParameterOrJSON<never>[]);

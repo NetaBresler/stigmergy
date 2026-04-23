@@ -59,10 +59,7 @@ export type Decay =
  * coexist on the same signal. The framework does not enforce a tag;
  * both channels are convention expressed through decay + shape.
  */
-export interface Signal<
-  TType extends string = string,
-  TShape extends z.ZodTypeAny = z.ZodTypeAny
-> {
+export interface Signal<TType extends string = string, TShape extends z.ZodTypeAny = z.ZodTypeAny> {
   readonly type: TType;
   readonly decay: Decay;
   readonly shape: TShape;
@@ -103,7 +100,7 @@ export type Filter =
  */
 export interface Role<
   TReads extends ReadonlyArray<Signal> = ReadonlyArray<Signal>,
-  TWrites extends ReadonlyArray<Signal> = ReadonlyArray<Signal>
+  TWrites extends ReadonlyArray<Signal> = ReadonlyArray<Signal>,
 > {
   readonly name: string;
   readonly reads: TReads;
@@ -128,9 +125,7 @@ export interface Role<
  * All three identity documents are optional. A framework consumer can
  * run Stigmergy with agents that have none — just an id and a role set.
  */
-export interface Agent<
-  TRoles extends ReadonlyArray<Role> = ReadonlyArray<Role>
-> {
+export interface Agent<TRoles extends ReadonlyArray<Role> = ReadonlyArray<Role>> {
   readonly id: string;
 
   /**
@@ -188,14 +183,9 @@ export interface ValidatorContext {
   ): Promise<ReadonlyArray<DepositedSignal<S>>>;
 }
 
-export interface Validator<
-  TTriggers extends ReadonlyArray<Signal> = ReadonlyArray<Signal>
-> {
+export interface Validator<TTriggers extends ReadonlyArray<Signal> = ReadonlyArray<Signal>> {
   readonly triggers: TTriggers;
-  validate(
-    signal: DepositedSignal<TTriggers[number]>,
-    ctx: ValidatorContext
-  ): Promise<Verdict>;
+  validate(signal: DepositedSignal<TTriggers[number]>, ctx: ValidatorContext): Promise<Verdict>;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,10 +287,7 @@ export interface Medium {
     def: Signal<TType, TShape>
   ): Signal<TType, TShape>;
 
-  defineRole<
-    TReads extends ReadonlyArray<Signal>,
-    TWrites extends ReadonlyArray<Signal>
-  >(
+  defineRole<TReads extends ReadonlyArray<Signal>, TWrites extends ReadonlyArray<Signal>>(
     def: Role<TReads, TWrites>
   ): Role<TReads, TWrites>;
 
@@ -313,9 +300,7 @@ export interface Medium {
    * this medium. Identity documents (soul, skills, memory) are loaded
    * when `run` is invoked, not at definition time.
    */
-  defineAgent<TRoles extends ReadonlyArray<Role>>(
-    def: Agent<TRoles>
-  ): Agent<TRoles>;
+  defineAgent<TRoles extends ReadonlyArray<Role>>(def: Agent<TRoles>): Agent<TRoles>;
 
   /**
    * Apply framework migrations and create per-signal-type tables from
@@ -330,20 +315,14 @@ export interface Medium {
    * Start an agent loop. The handler is invoked on a schedule (Phase 1
    * will specify cadence and LISTEN/NOTIFY semantics).
    */
-  run<A extends Agent<ReadonlyArray<Role>>>(
-    agent: A,
-    handler: AgentHandler<A>
-  ): Promise<void>;
+  run<A extends Agent<ReadonlyArray<Role>>>(agent: A, handler: AgentHandler<A>): Promise<void>;
 
   /**
    * Hot-swap a validator's rule without restarting the colony. The
    * next triggering signal sees the new rule; existing signals keep
    * their current strength and decay under the new regime.
    */
-  updateValidator<V extends Validator>(
-    validator: V,
-    nextValidate: V["validate"]
-  ): void;
+  updateValidator<V extends Validator>(validator: V, nextValidate: V["validate"]): void;
 
   /**
    * Developer escape hatch for inspection only. Raw read across the
@@ -381,9 +360,8 @@ export interface MediumClient {
  * `charter` is optional; when provided it's loaded (from path or treated
  * as inline markdown) and exposed as `ctx.charter` on every agent.
  */
-export declare function defineMedium(
-  connection: { url: string; charter?: string }
-): Medium;
-export declare function defineMedium(
-  connection: { client: MediumClient; charter?: string }
-): Medium;
+export declare function defineMedium(connection: { url: string; charter?: string }): Medium;
+export declare function defineMedium(connection: {
+  client: MediumClient;
+  charter?: string;
+}): Medium;

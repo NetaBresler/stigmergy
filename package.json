@@ -11,11 +11,7 @@
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "src",
-    "migrations"
-  ],
+  "files": ["dist", "src", "migrations"],
   "engines": {
     "node": ">=22"
   },

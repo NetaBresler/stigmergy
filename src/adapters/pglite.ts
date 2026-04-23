@@ -12,10 +12,7 @@ export function pgliteClient(db: PGlite): MediumClient {
     async exec(sql: string): Promise<void> {
       await db.exec(sql);
     },
-    async query<T = Record<string, unknown>>(
-      sql: string,
-      params: unknown[] = []
-    ): Promise<T[]> {
+    async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
       const result = await db.query<T>(sql, params);
       return result.rows;
     },

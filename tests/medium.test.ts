@@ -4,6 +4,7 @@ import { z } from "zod";
 import { pgliteClient } from "../src/adapters/pglite.js";
 import { defineMedium, depositSignalRow, tableNameFor } from "../src/medium.js";
 import { shapeHash } from "../src/shape.js";
+import type { Validator, Verdict } from "../src/types.js";
 
 /**
  * Medium + Signal tests. All run against in-process PGlite — no external
@@ -228,12 +229,10 @@ describe("depositSignalRow (internal helper used by the role runtime)", () => {
     // Seed an agent row so the FK succeeds.
     await db.query(`INSERT INTO stigmergy_agents (id) VALUES ($1)`, ["scout-01"]);
 
-    const deposited = await depositSignalRow(
-      pgliteClient(db),
-      signal,
-      "scout-01",
-      { niche: "cat-photography", claimed_by: null }
-    );
+    const deposited = await depositSignalRow(pgliteClient(db), signal, "scout-01", {
+      niche: "cat-photography",
+      claimed_by: null,
+    });
     expect(deposited.id).toMatch(/^[0-9a-f-]{36}$/);
 
     const rows = await db.query<{
@@ -247,6 +246,65 @@ describe("depositSignalRow (internal helper used by the role runtime)", () => {
     expect(rows.rows[0]?.claimed_by).toBeNull();
     expect(rows.rows[0]?.origin_agent_id).toBe("scout-01");
     expect(Number.parseFloat(rows.rows[0]?.strength ?? "0")).toBe(1.0);
+  });
+});
+
+describe("updateValidator hot-swap", () => {
+  let db: PGlite;
+  beforeEach(async () => {
+    db = new PGlite();
+    await db.waitReady;
+  });
+  afterEach(async () => {
+    await db.close();
+  });
+
+  it("replaces the validate function on the same validator reference", async () => {
+    const medium = defineMedium({ client: pgliteClient(db) });
+    const report = medium.defineSignal({
+      type: "report",
+      decay: { kind: "expiry", after: "1h" },
+      shape: z.object({ body: z.string() }),
+    });
+
+    const validator = medium.defineValidator({
+      triggers: [report],
+      async validate() {
+        return { approve: true, boost: 1 };
+      },
+    });
+
+    // First swap.
+    medium.updateValidator(validator, async () => ({ approve: true, boost: 99 }));
+
+    // Second swap against the *same* reference — this fails the pre-fix code
+    // because the old impl replaced the registry entry with a new object.
+    medium.updateValidator(validator, async () => ({ approve: false, penalty: 5 }));
+
+    // The caller's handle should reflect the latest validate.
+    const verdict = await validator.validate(
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        type: "report",
+        payload: { body: "x" },
+        createdAt: new Date(),
+        originAgentId: "agent-1",
+      },
+      // ValidatorContext stub — not exercised by this validator.
+      { find: async () => [] }
+    );
+    expect(verdict).toEqual({ approve: false, penalty: 5 });
+  });
+
+  it("throws when the validator is not registered on this medium", () => {
+    const medium = defineMedium({ client: pgliteClient(db) });
+    const rogue: Validator = {
+      triggers: [],
+      validate: async (): Promise<Verdict> => ({ approve: true }),
+    };
+    expect(() =>
+      medium.updateValidator(rogue, async (): Promise<Verdict> => ({ approve: false }))
+    ).toThrow();
   });
 });
 

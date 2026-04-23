@@ -40,15 +40,11 @@ export async function migrate(
 ): Promise<MigrationResult> {
   await client.exec(TRACKING_TABLE_SQL);
 
-  const files = (await readdir(migrationsDir))
-    .filter((name) => name.endsWith(".sql"))
-    .sort();
+  const files = (await readdir(migrationsDir)).filter((name) => name.endsWith(".sql")).sort();
 
   for (const file of files) {
     if (!FILENAME_PATTERN.test(file)) {
-      throw new Error(
-        `Migration filename does not match NNN_snake_case.sql: ${file}`
-      );
+      throw new Error(`Migration filename does not match NNN_snake_case.sql: ${file}`);
     }
   }
 
@@ -61,10 +57,7 @@ export async function migrate(
   for (const file of pending) {
     const sql = await readFile(join(migrationsDir, file), "utf8");
     await client.exec(sql);
-    await client.query(
-      `INSERT INTO _stigmergy_migrations (name) VALUES ($1)`,
-      [file]
-    );
+    await client.query(`INSERT INTO _stigmergy_migrations (name) VALUES ($1)`, [file]);
   }
 
   return { applied: pending };

@@ -59,10 +59,7 @@ export function decayColumnsDDL(decay: Decay): readonly string[] {
     case "expiry":
       return ["expires_at timestamptz NOT NULL"];
     case "strength":
-      return [
-        "strength numeric NOT NULL",
-        "last_decay_at timestamptz NOT NULL DEFAULT now()",
-      ];
+      return ["strength numeric NOT NULL", "last_decay_at timestamptz NOT NULL DEFAULT now()"];
     case "reinforcement":
       return [];
   }
@@ -77,10 +74,7 @@ export function decayColumnsDDL(decay: Decay): readonly string[] {
  *     return nothing so the column defaults are used)
  *   - reinforcement: nothing (strength is a join-count, not a column)
  */
-export function decayInsertValues(
-  decay: Decay,
-  now: Date = new Date()
-): Record<string, unknown> {
+export function decayInsertValues(decay: Decay, now: Date = new Date()): Record<string, unknown> {
   switch (decay.kind) {
     case "expiry": {
       const expires = new Date(now.getTime() + durationSeconds(decay.after) * 1000);
@@ -119,10 +113,7 @@ const DEFAULT_STRENGTH_FLOOR = 0.01;
  *                   Approvals without explicit boost count as 1; rejections
  *                   without explicit penalty don't subtract.
  */
-export function effectiveStrengthSQL(
-  decay: Decay,
-  ctx: DecaySqlContext
-): string {
+export function effectiveStrengthSQL(decay: Decay, ctx: DecaySqlContext): string {
   const { signalType, tableAlias } = ctx;
   switch (decay.kind) {
     case "expiry":
@@ -151,10 +142,7 @@ export function effectiveStrengthSQL(
  * strength > 0). Callers use this in WHERE clauses. Wraps the
  * effectiveStrengthSQL expression with `> 0`.
  */
-export function visibilityPredicate(
-  decay: Decay,
-  ctx: DecaySqlContext
-): string {
+export function visibilityPredicate(decay: Decay, ctx: DecaySqlContext): string {
   return `(${effectiveStrengthSQL(decay, ctx)}) > 0`;
 }
 

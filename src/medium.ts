@@ -56,11 +56,7 @@ interface MediumState {
   closed: boolean;
 }
 
-const MIGRATIONS_DIR = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "migrations"
-);
+const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -143,14 +139,14 @@ function buildMedium(state: MediumState): Medium {
     },
 
     updateValidator(validator, nextValidate) {
-      // Replace the validator's `validate` by identity.
       const idx = state.validators.indexOf(validator);
       if (idx < 0) {
         throw new Error("updateValidator: validator is not registered on this medium.");
       }
-      const current = state.validators[idx];
-      if (!current) return;
-      state.validators[idx] = { ...current, validate: nextValidate } as Validator;
+      // Mutate in place. The Validator becomes runtime-owned after
+      // registration; hot-swap is the primitive's whole job, and the
+      // caller's reference must stay valid across successive swaps.
+      (validator as { validate: typeof nextValidate }).validate = nextValidate;
     },
 
     async query(sql) {
@@ -183,9 +179,10 @@ async function migrateSignal(client: MediumClient, signal: Signal): Promise<void
     decay_kind: string;
     decay_config: unknown;
     shape_hash: string;
-  }>(`SELECT table_name, decay_kind, decay_config, shape_hash FROM stigmergy_signal_registry WHERE type = $1`, [
-    signal.type,
-  ]);
+  }>(
+    `SELECT table_name, decay_kind, decay_config, shape_hash FROM stigmergy_signal_registry WHERE type = $1`,
+    [signal.type]
+  );
 
   if (existing.length > 0) {
     const row = existing[0];

@@ -66,18 +66,13 @@ describe("decayInsertValues", () => {
 
   it("seeds strength at 1.0 for strength decay", () => {
     const now = new Date("2026-04-22T12:00:00Z");
-    const vals = decayInsertValues(
-      { kind: "strength", factor: 0.9, period: "1h" },
-      now
-    );
+    const vals = decayInsertValues({ kind: "strength", factor: 0.9, period: "1h" }, now);
     expect(vals.strength).toBe(1.0);
     expect(vals.last_decay_at).toBe(now);
   });
 
   it("inserts nothing for reinforcement decay", () => {
-    expect(
-      decayInsertValues({ kind: "reinforcement", window: "6h" })
-    ).toEqual({});
+    expect(decayInsertValues({ kind: "reinforcement", window: "6h" })).toEqual({});
   });
 });
 
@@ -143,9 +138,7 @@ describe("expiry decay (integration)", () => {
     const stats = await sweepSignal(client, "test_expiry", "test_expiry", decay);
     expect(stats.deleted).toBe(2);
 
-    const remaining = await db.query(
-      `SELECT count(*)::text AS count FROM test_expiry`
-    );
+    const remaining = await db.query(`SELECT count(*)::text AS count FROM test_expiry`);
     expect((remaining.rows[0] as { count: string }).count).toBe("1");
   });
 });
@@ -184,9 +177,7 @@ describe("strength decay (integration)", () => {
       signalType: "test_strength",
       tableAlias: "s",
     });
-    const result = await db.query(
-      `SELECT (${expr})::text AS strength FROM test_strength s`
-    );
+    const result = await db.query(`SELECT (${expr})::text AS strength FROM test_strength s`);
     const value = Number.parseFloat((result.rows[0] as { strength: string }).strength);
     expect(value).toBeGreaterThan(0.99);
     expect(value).toBeLessThanOrEqual(1.0);
@@ -201,9 +192,7 @@ describe("strength decay (integration)", () => {
       signalType: "test_strength",
       tableAlias: "s",
     });
-    const result = await db.query(
-      `SELECT (${expr})::text AS strength FROM test_strength s`
-    );
+    const result = await db.query(`SELECT (${expr})::text AS strength FROM test_strength s`);
     const value = Number.parseFloat((result.rows[0] as { strength: string }).strength);
     expect(value).toBeGreaterThan(0.49);
     expect(value).toBeLessThan(0.51);
@@ -219,9 +208,7 @@ describe("strength decay (integration)", () => {
       signalType: "test_strength",
       tableAlias: "s",
     });
-    const result = await db.query(
-      `SELECT (${expr})::text AS strength FROM test_strength s`
-    );
+    const result = await db.query(`SELECT (${expr})::text AS strength FROM test_strength s`);
     expect((result.rows[0] as { strength: string }).strength).toBe("0.0");
   });
 
@@ -253,9 +240,7 @@ describe("strength decay (integration)", () => {
     const stats = await sweepSignal(client, "test_strength", "test_strength", decay);
     expect(stats.deleted).toBe(1);
 
-    const remaining = await db.query(
-      `SELECT count(*)::text AS count FROM test_strength`
-    );
+    const remaining = await db.query(`SELECT count(*)::text AS count FROM test_strength`);
     expect((remaining.rows[0] as { count: string }).count).toBe("1");
   });
 });
@@ -305,9 +290,7 @@ describe("reinforcement decay (integration)", () => {
       signalType: "test_reinforcement",
       tableAlias: "s",
     });
-    const result = await db.query(
-      `SELECT (${expr})::text AS strength FROM test_reinforcement s`
-    );
+    const result = await db.query(`SELECT (${expr})::text AS strength FROM test_reinforcement s`);
     expect((result.rows[0] as { strength: string }).strength).toBe("0");
   });
 
@@ -385,12 +368,7 @@ describe("reinforcement decay (integration)", () => {
 
   it("sweepSignal is a no-op for reinforcement decay", async () => {
     const client = pgliteClient(db);
-    const stats = await sweepSignal(
-      client,
-      "test_reinforcement",
-      "test_reinforcement",
-      decay
-    );
+    const stats = await sweepSignal(client, "test_reinforcement", "test_reinforcement", decay);
     expect(stats).toEqual({
       signalType: "test_reinforcement",
       deleted: 0,
