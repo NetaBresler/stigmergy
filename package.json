@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "STIGMERGY_TEST_PG_URL=$STIGMERGY_TEST_PG_URL vitest run tests/postgres-js.integration.test.ts",
     "lint": "biome check .",
     "format": "biome format --write ."
   },

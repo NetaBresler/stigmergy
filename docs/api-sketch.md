@@ -145,27 +145,33 @@ The validator watches `scout_report` deposits and, if the report looks good, boo
 
 ```ts
 const reportValidator = medium.defineValidator({
+  name: "report_reviewer",
   triggers: [scoutReport],
   async validate(report, ctx) {
     const body = report.payload.body;
     const lookGood = body.length > 200 && /\bdemand\b/.test(body);
     if (!lookGood) return { approve: false };
 
-    const [matchingPheromone] = await ctx.find("demand_pheromone", {
-      op: "eq",
-      field: "niche",
-      value: report.payload.niche,
-    });
+    const [matchingPheromone] = await ctx.find("demand_pheromone");
     if (!matchingPheromone) return { approve: true };  // nothing to reinforce
 
     return {
       approve: true,
-      target: matchingPheromone.id,
+      target: { type: "demand_pheromone", id: matchingPheromone.id },
       boost: report.payload.recommended_strength,
     };
   },
 });
 ```
+
+Two shape notes the runtime added during Phase 1:
+
+- **`name`** is required. Reinforcements are logged with `validated_by = name` so
+  multiple validators on the same trigger are attributed independently, and audit
+  history survives restarts.
+- **`target`** is `{ type, id }`, not a bare id. A bare id would force the runtime
+  to scan every per-type table to find where the target lives; requiring the type
+  makes the mutation cheap and the code readable.
 
 The verdict is uniform whether the validator is rule-based (like this), agent-based (swap the body for an LLM call), or human-in-the-loop (await a promise that a webhook resolves). The framework applies the verdict.
 
