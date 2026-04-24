@@ -24,16 +24,17 @@ The package builds itself on install (via `prepare`). Node 22+. Postgres is the 
 
 ## Quick start
 
-Clone and run the worked example:
+Clone and run the worked examples:
 
 ```bash
 git clone https://github.com/NetaBresler/stigmergy
 cd stigmergy
 npm install
-npx tsx examples/niche-discovery.ts
+npx tsx examples/bug-triage.ts       # 3 agents, ~5s — the teaching ground
+npx tsx examples/oss-maintainer.ts   # 10 agents, ~25s — the showcase
 ```
 
-You'll see a three-agent colony (Scout, Worker, Validator) deposit signals, compete for claims, and reinforce the winning pheromones while the weak ones decay. See [`examples/README.md`](examples/README.md) for what's happening.
+`bug-triage.ts` walks a Reporter, two Triagers, and a Validator through every primitive — strength decay, claim races, cross-signal reinforcement — in about 240 lines. `oss-maintainer.ts` is the same framework turned up to ten agents across three simulated sensor streams; the summary at the bottom shows emergent specialization with no planner. See [`examples/README.md`](examples/README.md) for what's happening.
 
 ## Why this exists
 

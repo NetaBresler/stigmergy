@@ -1,8 +1,6 @@
 # API sketch — a worked example
 
-This walks through what using Stigmergy feels like, end-to-end, in enough detail that you can push back on the shape before any runtime is built.
-
-No runtime exists yet. Every code block below is aspirational. If the shape feels wrong here, it's wrong, and we change `src/types.ts` before anyone writes implementation code.
+This walks through what using Stigmergy feels like, end-to-end. The runtime it describes is the same one `examples/bug-triage.ts` runs against — pull both open side-by-side.
 
 ## Phase 1 revisions
 
@@ -10,20 +8,20 @@ Three changes to the Phase 0 surface as implementation landed:
 
 - **`medium.migrate()`** — explicit migration step. Apply framework tables and create per-signal-type tables from the currently registered definitions. Idempotent; rejects when a registered signal's stored shape hash no longer matches the code.
 - **`defineMedium({ client })`** — bring-your-own-client overload. The `{ url }` form opens postgres-js internally; `{ client }` accepts any `MediumClient` (PGlite in tests; a pooled connection or pgbouncer in production).
-- **`defineSignal` returns the Signal, not a widened Medium.** The Phase 0 types had `defineSignal` return `Medium<[...signals, newSignal]>` to make "signal must belong to this medium" a compile-time check. In practice that broke the natural idiom `const pheromone = medium.defineSignal(...); defineRole({ reads: [pheromone] })`. The accumulating type parameter has been removed from `Medium`; the constraint now lives at runtime (the medium rejects roles/validators referencing unregistered signals at `migrate()` time).
+- **`defineSignal` returns the Signal, not a widened Medium.** The Phase 0 types had `defineSignal` return `Medium<[...signals, newSignal]>` to make "signal must belong to this medium" a compile-time check. In practice that broke the natural idiom `const bug = medium.defineSignal(...); defineRole({ reads: [bug] })`. The accumulating type parameter has been removed from `Medium`; the constraint now lives at runtime (the medium rejects roles/validators referencing unregistered signals at `migrate()` time).
 
 ---
 
 ## The scenario
 
-A toy colony with the following moving parts:
+A toy bug-triage colony with the following moving parts:
 
-- **One quantitative signal** — a `demand_pheromone` that says "this niche looks promising" with a strength that decays if nobody reinforces it.
-- **One qualitative signal** — a `scout_report` with a freeform markdown body.
-- **Two roles** — `ScoutRole` (explore new territory, deposit demand + reports) and `WorkerRole` (pick up high-strength demand and build a prototype).
-- **One agent** — `Scout`, who can enact *either* role depending on what the medium shows.
-- **One validator** — approves `scout_report` signals that meet a quality bar, which boosts the associated demand pheromone.
-- **A charter** at colony level and a soul, skills, and memory file per agent.
+- **One quantitative signal** — a `reported_bug` with a strength that encodes "how loudly does this still need attention" and decays if nobody confirms it.
+- **One qualitative signal** — a `triage_note` with a freeform body, a structured verdict (`confirm` / `duplicate` / `invalid`), and a link back to the bug it's about.
+- **Two roles** — `ReporterRole` (file new bugs) and `TriagerRole` (pick up unclaimed bugs, investigate, write a triage note).
+- **Three agents** — one Reporter and two competing Triagers (so claims are non-trivial).
+- **One validator** — reads triage notes. Confirmed notes boost the bug's strength; duplicates and invalid reports push it down. This is the cross-signal reinforcement that keeps real bugs loud and noise quiet.
+- **A charter** at colony level, with optional soul, skills, and memory files per agent.
 
 Small enough to fit on a screen. Real enough to exercise every primitive.
 
@@ -47,53 +45,44 @@ The charter is loaded once and exposed as `ctx.charter` in every handler. One pe
 
 ## Defining signals
 
-A quantitative signal — a pheromone with numeric strength that decays:
+A quantitative signal — a bug record with numeric strength that decays:
 
 ```ts
-const demandPheromone = medium.defineSignal({
-  type: "demand_pheromone",
-  decay: { kind: "strength", factor: 0.9, period: "1h", floor: 0.05 },
+const reportedBug = medium.defineSignal({
+  type: "reported_bug",
+  decay: { kind: "strength", factor: 0.5, period: "30s", floor: 0.05 },
   shape: z.object({
-    niche: z.string(),
+    title: z.string(),
+    component: z.string(),
+    severity: z.number(),
+    body: z.string(),
     claimed_by: z.string().nullable(),
     claimed_until: z.date().nullable(),
   }),
 });
 ```
 
-Every hour, every `demand_pheromone`'s strength is multiplied by 0.9. Below `0.05` it's invisible to readers. Reinforcement keeps it alive.
+Every 30 seconds, every `reported_bug`'s strength is multiplied by 0.5. Below `0.05` it's invisible to readers. (In production you'd use hours or days; the example uses seconds so the decay is watchable.)
 
 `claimed_by` / `claimed_until` are shape fields — the claim-as-convention pattern. No new primitive, just fields. `ctx.tryClaim()` does the atomic write.
 
-A qualitative signal — a report with a markdown body:
+A qualitative signal — a triage note that carries a verdict:
 
 ```ts
-const scoutReport = medium.defineSignal({
-  type: "scout_report",
-  decay: { kind: "expiry", after: "72h" },
-  shape: z.object({
-    niche: z.string(),
-    body: z.string(),
-    recommended_strength: z.number(),
-  }),
-});
-```
-
-Reports live 72 hours. An approved report's boost is applied to the matching demand pheromone (see validator below).
-
-A worker result:
-
-```ts
-const workerResult = medium.defineSignal({
-  type: "worker_result",
+const triageNote = medium.defineSignal({
+  type: "triage_note",
   decay: { kind: "expiry", after: "24h" },
   shape: z.object({
-    niche: z.string(),
-    outcome: z.enum(["shipped", "failed", "blocked"]),
+    bug_id: z.string(),
+    bug_title: z.string(),
+    verdict: z.enum(["confirm", "duplicate", "invalid"]),
     body: z.string(),
+    recommended_boost: z.number(),
   }),
 });
 ```
+
+Notes live 24 hours. The validator applies their verdict to the matching `reported_bug` (see below).
 
 **Rule the framework enforces:** `defineSignal` without `decay` is a type error. Not runtime, not lint — the code does not compile.
 
@@ -104,29 +93,25 @@ const workerResult = medium.defineSignal({
 Roles describe *functions*, not agents. They say what signals get read, what gets written, and what slice of the medium is visible.
 
 ```ts
-const ScoutRole = medium.defineRole({
-  name: "Scout",
-  reads: [demandPheromone],
-  writes: [demandPheromone, scoutReport],
-  localQuery: {
-    types: ["demand_pheromone"],
-    where: { op: "lt", field: "strength", value: 0.3 },
-    orderBy: { field: "created_at", direction: "desc" },
-    limit: 20,
-  },
+const ReporterRole = medium.defineRole({
+  name: "Reporter",
+  reads: [reportedBug],
+  writes: [reportedBug],
+  // Phase 1: localQuery.types must name exactly one read type.
+  localQuery: { types: ["reported_bug"], limit: 50 },
 });
 
-const WorkerRole = medium.defineRole({
-  name: "Worker",
-  reads: [demandPheromone],
-  writes: [workerResult],
+const TriagerRole = medium.defineRole({
+  name: "Triager",
+  reads: [reportedBug],
+  writes: [triageNote],
   localQuery: {
-    types: ["demand_pheromone"],
+    types: ["reported_bug"],
     where: {
       op: "and",
       clauses: [
-        { op: "gt", field: "strength", value: 0.7 },
         { op: "eq", field: "claimed_by", value: null },
+        { op: "gt", field: "strength", value: 0.1 },
       ],
     },
     orderBy: { field: "strength", direction: "desc" },
@@ -135,71 +120,61 @@ const WorkerRole = medium.defineRole({
 });
 ```
 
-ScoutRole sees faint or absent trails. WorkerRole sees top-five unclaimed, high-strength pheromones. Neither knows the other exists. Each is a bounded view; an agent in that role cannot look beyond it.
+Reporter sees every current bug so it can avoid re-filing duplicates. Triager sees only unclaimed bugs above the "worth-triaging" strength floor, loudest first. Neither knows the other exists. Each is a bounded view; an agent in that role cannot look beyond it.
 
 ---
 
 ## Defining a validator
 
-The validator watches `scout_report` deposits and, if the report looks good, boosts the matching demand pheromone:
+The validator watches `triage_note` deposits and applies their verdict to the matching `reported_bug`:
 
 ```ts
-const reportValidator = medium.defineValidator({
-  name: "report_reviewer",
-  triggers: [scoutReport],
-  async validate(report, ctx) {
-    const body = report.payload.body;
-    const lookGood = body.length > 200 && /\bdemand\b/.test(body);
-    if (!lookGood) return { approve: false };
+const triageReviewer = medium.defineValidator({
+  name: "triage_reviewer",
+  triggers: [triageNote],
+  async validate(note) {
+    const { verdict, bug_id, recommended_boost } = note.payload;
+    const target = { type: "reported_bug", id: bug_id };
 
-    const [matchingPheromone] = await ctx.find("demand_pheromone");
-    if (!matchingPheromone) return { approve: true };  // nothing to reinforce
-
-    return {
-      approve: true,
-      target: { type: "demand_pheromone", id: matchingPheromone.id },
-      boost: report.payload.recommended_strength,
-    };
+    if (verdict === "confirm") return { approve: true, boost: recommended_boost, target };
+    if (verdict === "duplicate") return { approve: false, penalty: 0.4, target };
+    return { approve: false, penalty: 0.8, target };
   },
 });
 ```
 
 Two shape notes the runtime added during Phase 1:
 
-- **`name`** is required. Reinforcements are logged with `validated_by = name` so
-  multiple validators on the same trigger are attributed independently, and audit
-  history survives restarts.
-- **`target`** is `{ type, id }`, not a bare id. A bare id would force the runtime
-  to scan every per-type table to find where the target lives; requiring the type
-  makes the mutation cheap and the code readable.
+- **`name`** is required. Reinforcements are logged with `validated_by = name` so multiple validators on the same trigger are attributed independently, and audit history survives restarts.
+- **`target`** is `{ type, id }`, not a bare id. A bare id would force the runtime to scan every per-type table to find where the target lives; requiring the type makes the mutation cheap and the code readable.
 
 The verdict is uniform whether the validator is rule-based (like this), agent-based (swap the body for an LLM call), or human-in-the-loop (await a promise that a webhook resolves). The framework applies the verdict.
 
-If goals change mid-project, hot-swap the rule — `medium.updateValidator(reportValidator, newValidate)` — and the next report is judged under the new regime. The colony re-orients within one decay cycle.
+If goals change mid-project, hot-swap the rule — `medium.updateValidator(triageReviewer, newValidate)` — and the next note is judged under the new regime. The colony re-orients within one decay cycle.
 
 ---
 
-## Defining an agent
+## Defining agents
 
-One agent, two roles. This is where polyethism lives — an agent that can enact either role depending on what the medium shows:
+Three agents: one Reporter and two competing Triagers:
 
 ```ts
-const Scout = medium.defineAgent({
-  id: "scout-01",
-  soul: "./agents/scout/SOUL.md",
-  skills: [
-    "./agents/scout/skills/web-research.md",
-    "./agents/scout/skills/niche-analysis.md",
-  ],
-  memory: "./agents/scout/MEMORY.md",
-  roles: [ScoutRole, WorkerRole],
+const reporter = medium.defineAgent({
+  id: "reporter-01",
+  soul:  "./agents/reporter/SOUL.md",
+  skills: ["./agents/reporter/skills/normalise-issue.md"],
+  memory: "./agents/reporter/MEMORY.md",
+  roles: [ReporterRole],
 });
+
+const triager1 = medium.defineAgent({ id: "triager-01", roles: [TriagerRole] });
+const triager2 = medium.defineAgent({ id: "triager-02", roles: [TriagerRole] });
 ```
 
 The four identity documents:
 
 - **SOUL.md** — who this agent is. Personality, voice, values, boundaries. Rarely changes.
-- **SKILL.md** files — what this agent can do. Web research, niche analysis. Added/removed as capabilities evolve.
+- **SKILL.md** files — what this agent can do. Added/removed as capabilities evolve.
 - **MEMORY.md** — what this agent has learned. Consolidated, not streamed. Rewritten at end of each run.
 - **CHARTER.md** — colony-wide mission. Inherited from the medium.
 
@@ -209,80 +184,57 @@ All four are optional. An agent with none is a valid agent — it just has a sta
 
 ---
 
-## Running the agent
+## Running the agents
 
 ```ts
-await medium.run(Scout, async (ctx) => {
-  // ctx.soul, ctx.skills, ctx.memory, ctx.charter are loaded.
-  // They are plain text. The framework does not interpret them —
-  // the handler passes them to its LLM calls as needed.
+await medium.migrate();
 
-  // Polyethism, the stigmergic way: gather every signal the agent's roles
-  // can see, score by pressure, and act on whichever is loudest. The
-  // handler is not routing through a menu — it's responding to a gradient.
-  const pressures = (
-    await Promise.all(
-      Scout.roles.map(async (role) => {
-        const signals = await ctx.as(role).view();
-        return signals.map((s) => ({
-          role,
-          signal: s,
-          pressure: s.strength ?? 1,  // expiry-decay signals carry binary pressure
-        }));
-      })
-    )
-  ).flat();
+// Reporter files seed bugs one per tick.
+await medium.run(reporter, async (ctx) => {
+  const filed = await ctx.as(ReporterRole).view();
+  const seen = new Set(filed.map(b => b.payload.title));
+  const nextBug = SEED_BUGS.find(b => !seen.has(b.title));
+  if (!nextBug) return;
 
-  const loudest = pressures.sort((a, b) => b.pressure - a.pressure)[0];
-
-  if (!loudest) {
-    // Nothing pulling at this agent. Explore: deposit a fresh, faint trail
-    // so the next agent has something to react to. (Exploration is what an
-    // ant does when it finds no pheromone to follow.)
-    const niche = await pickFreshNiche(ctx.soul, ctx.memory, ctx.charter);
-    await ctx.as(ScoutRole).deposit("demand_pheromone", {
-      niche,
-      claimed_by: null,
-      claimed_until: null,
-    });
-  } else {
-    // Act in whichever role surfaced the loudest signal. The agent doesn't
-    // pick a role then look for work; the work picks the role.
-    const role = ctx.as(loudest.role);
-    const claimed = await role.tryClaim(loudest.signal.id, { until: "6h" });
-    if (!claimed) return;  // another agent got there first
-
-    if (loudest.role === WorkerRole) {
-      const result = await buildPrototype(loudest.signal.payload.niche, {
-        soul: ctx.soul, skills: ctx.skills, memory: ctx.memory, charter: ctx.charter,
-      });
-      await role.deposit("worker_result", {
-        niche: loudest.signal.payload.niche,
-        outcome: result.outcome,
-        body: result.notes,
-      });
-    } else {
-      const report = await investigate(loudest.signal.payload.niche, ctx.skills);
-      await role.deposit("scout_report", {
-        niche: loudest.signal.payload.niche,
-        body: report.markdown,
-        recommended_strength: report.score,
-      });
-    }
-
-    await role.release(loudest.signal.id);
-  }
-
-  // End-of-run: consolidate memory. The agent's LLM distills what it
-  // learned this tick into a rewritten MEMORY.md. This is the
-  // biomimetic forgetting pass.
-  const consolidated = await consolidate({
-    previousMemory: ctx.memory,
-    soul: ctx.soul,
-    justHappened: /* summarize what the handler did */,
+  await ctx.as(ReporterRole).deposit("reported_bug", {
+    ...nextBug,
+    claimed_by: null,
+    claimed_until: null,
   });
-  await ctx.writeMemory(consolidated);
 });
+
+// Triagers compete for claims and write a triage_note each.
+const triage = async (ctx: AgentContext<typeof triager1>) => {
+  const queue = await ctx.as(TriagerRole).view();
+  const target = queue[0];
+  if (!target) return;
+
+  // tryClaim is atomic. If the other triager already has it, we get
+  // `false` and move on without any further coordination.
+  const claimed = await ctx.as(TriagerRole).tryClaim(target.id, { until: "2m" });
+  if (!claimed) return;
+
+  const verdict = classify(target.payload);
+  const recommended_boost =
+    verdict === "confirm" ? 4 - target.payload.severity : 0;
+
+  await ctx.as(TriagerRole).deposit("triage_note", {
+    bug_id: target.id,
+    bug_title: target.payload.title,
+    verdict,
+    body: `auto-triage: ${target.payload.body}`,
+    recommended_boost,
+  });
+
+  // Intentionally do NOT release the claim — a triaged bug is done;
+  // re-triaging would double-count. The 2m claim TTL auto-releases in
+  // the unlikely case this triager crashes.
+};
+
+await Promise.all([
+  medium.run(triager1, triage),
+  medium.run(triager2, triage),
+]);
 ```
 
 What's in the context:
@@ -300,25 +252,25 @@ What's in the context:
 const medium = defineMedium({ url, charter });
 
 // Signals
-const demandPheromone = medium.defineSignal({ ... });
-const scoutReport    = medium.defineSignal({ ... });
-const workerResult   = medium.defineSignal({ ... });
+const reportedBug = medium.defineSignal({ ... });
+const triageNote  = medium.defineSignal({ ... });
 
 // Roles
-const ScoutRole  = medium.defineRole({ ... });
-const WorkerRole = medium.defineRole({ ... });
+const ReporterRole = medium.defineRole({ ... });
+const TriagerRole  = medium.defineRole({ ... });
 
 // Validators
-const reportValidator = medium.defineValidator({ ... });
+const triageReviewer = medium.defineValidator({ ... });
 
 // Agents
-const Scout  = medium.defineAgent({ id: "scout-01", roles: [ScoutRole, WorkerRole], ... });
-const Scout2 = medium.defineAgent({ id: "scout-02", roles: [ScoutRole, WorkerRole], ... });
-// ... more agents, same shape.
+const reporter = medium.defineAgent({ id: "reporter-01", roles: [ReporterRole], ... });
+const triager1 = medium.defineAgent({ id: "triager-01", roles: [TriagerRole] });
+const triager2 = medium.defineAgent({ id: "triager-02", roles: [TriagerRole] });
 
 await Promise.all([
-  medium.run(Scout,  scoutHandler),
-  medium.run(Scout2, scoutHandler),
+  medium.run(reporter, reporterHandler),
+  medium.run(triager1, triageHandler),
+  medium.run(triager2, triageHandler),
 ]);
 ```
 
@@ -355,6 +307,7 @@ Flagged for Phase 1, not solved here:
 
 1. **Scheduling.** `medium.run()` starts a loop, but on what cadence? Polling interval? Postgres `LISTEN/NOTIFY`? Both?
 2. **Agent identity persistence.** `agentId` is on every deposit. Is one agent per process the right granularity, or can one process run several agents?
-3. **Reinforcement history on DepositedSignal.** If an agent wants to see "this pheromone has been reinforced three times in the last hour," it can't — the type doesn't expose history. Either we add it, or we say "query the medium directly" and keep the hot path lean.
+3. **Reinforcement history on DepositedSignal.** If an agent wants to see "this signal has been reinforced three times in the last hour," it can't — the type doesn't expose history. Either we add it, or we say "query the medium directly" and keep the hot path lean.
 4. **Signal versioning.** `defineSignal` has no `version` field yet. For schema evolution across deployments, probably yes, but not Phase 0.
 5. **Memory size control.** MEMORY.md could grow unbounded if the agent's consolidation is too verbose. The framework could cap size and force the agent to prune, or trust the agent to compress. Lean toward trust for now, revisit if it bites.
+6. **Cross-signal dedup for validators.** When a verdict's `target` differs from the trigger, the audit row is keyed to the target, so the dispatcher's "already processed" check on the trigger doesn't fire. In the example, the validator guards itself with an in-closure Set. Whether the framework should own that dedup is an open question.

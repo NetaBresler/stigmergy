@@ -83,9 +83,13 @@ A knowledge base tells an agent *what is true*. A medium tells an agent *what to
 
 ## A worked example
 
-We're building Stigmergy because we needed it. The first system running on it is a digital product factory — niches in, validated products out — where the Supabase project is the medium, and a handful of specialized agents (Scout, Copywriter, Designer, Ad Manager, Reporter) work against it without any central orchestrator. Colonies are rows in a table. Demand signal lives as aggregate pheromone in another table. Past failures reshape future searches through a learning log — qualitative stigmergy in plain markdown.
+The `examples/` directory in this repo has two colonies you can run end-to-end against in-process Postgres. No install, no API keys — just `npx tsx`.
 
-That factory is private. Stigmergy, the framework underneath it, is this repo. One is a product; the other is the pattern. We're publishing the pattern because we think it has a life beyond any one implementation of it.
+`bug-triage.ts` is the teaching ground: three agents, one medium, every primitive exercised in about 240 lines. A Reporter files bugs, two Triagers compete for claims, a Validator reinforces real bugs and penalises noise. You can watch strength decay, watch the claim race, watch signals evaporate.
+
+`oss-maintainer.ts` is the showcase. Ten agents keeping an open-source project healthy — three sensor agents translating simulated GitHub / community / social events into signals, three Triagers, two Responders, two Reviewers, and a Broadcaster announcing merges. Nobody assigns anyone to a component. Over ~25 seconds of wall time, the colony visibly specializes — one Triager trends frontend, another trends backend, purely because claims plus validator reinforcement route the work on their own.
+
+Both run against the same reference implementation that ships in `src/`. If you want to see what Stigmergy feels like before reading another word of theory, run them.
 
 ## The hard parts — and why decay is the one that kills you
 
