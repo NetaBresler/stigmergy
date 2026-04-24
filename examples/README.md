@@ -1,6 +1,6 @@
 # Stigmergy examples
 
-Two self-contained colonies that show what the framework does and why. Both run entirely against in-process [PGlite](https://github.com/electric-sql/pglite) — no Postgres install, no API keys.
+Three self-contained colonies that show what the framework does and why. All run entirely against in-process [PGlite](https://github.com/electric-sql/pglite) — no Postgres install, no API keys.
 
 ## Running
 
@@ -14,20 +14,23 @@ npm install
 
 `npm install` builds the package (via the `prepare` script). Node 22+.
 
-Then either:
+Then any of:
 
 ```bash
-npx tsx examples/bug-triage.ts       # 10-minute read, 3 agents, ~5s run
-npx tsx examples/oss-maintainer.ts   # 25s run, 10 agents, watch it live
+npx tsx examples/bug-triage.ts       # 3 agents, ~5s run, every primitive once
+npx tsx examples/polyethism.ts       # 1 agent, 2 roles, role-drift in action
+npx tsx examples/oss-maintainer.ts   # 10 agents, ~25s run, emergent specialization
 ```
 
 ---
 
 ## Which one should I run first?
 
-**Start with `bug-triage.ts`** if you want to learn the primitives. It's the teaching ground — about 240 lines, one file, every primitive appears exactly once. Read it end-to-end and you can write your own colony.
+**Start with `bug-triage.ts`** to learn the primitives. The teaching ground — about 240 lines, one file, every primitive appears exactly once. Read it end-to-end and you can write your own colony.
 
-**Read `oss-maintainer.ts`** when you want to see why the pattern matters. It's about 500 lines, ten agents, three sensor types, and shows emergent specialization under load. The punchline is the summary at the bottom of the run output — agents self-select components without any planner assigning them.
+**Read `polyethism.ts`** to see why **Agent** is a separate primitive from **Role**. About 180 lines, one file, one agent wearing two roles and switching between them tick-by-tick based on what the medium is loudest about. This is the smallest runnable demonstration of polyethism.
+
+**Read `oss-maintainer.ts`** to see why the pattern matters at scale. About 500 lines, ten agents, three sensor types — shows emergent specialization under load. The punchline is the summary at the bottom of the run output: agents self-select components without any planner assigning them.
 
 ---
 
@@ -56,6 +59,23 @@ Everything is in one file. In order, you'll see:
 4. `defineValidator` that applies a note's verdict to the matching bug via cross-signal `target`.
 5. `defineAgent` wrapping each role with a stable id.
 6. `runAgent` starting each loop.
+
+---
+
+## `polyethism.ts` — one agent, two roles
+
+A single agent, `researcher-01`, enacts two roles — Explorer (propose a research question) and Worker (execute a reinforced one) — and the handler picks between them every tick based on which role's view is loudest. That's the point: no scheduler, no state machine, just "what is the medium loudest about right now?"
+
+### What to watch for
+
+- **Early ticks log `[as Explorer]`.** The Worker view filters for strength > 1.0; at start nothing qualifies, so the agent seeds proposals.
+- **Validator reinforces some proposals strongly.** Every third proposal gets a big boost; the rest get a small one. The landscape becomes uneven.
+- **Later ticks start logging `[as Worker]`.** Same agent, different function, selected by pressure. The switch isn't scripted — it falls out of which view has signals above threshold.
+- **The summary at the end** shows how the one agent split its ticks across roles. Polyethism in a single number pair.
+
+### Why it's its own example
+
+`bug-triage.ts` has many agents, each with one role. That teaches Role and Locality, but it leaves Agent-as-distinct-from-Role implicit. `polyethism.ts` is the minimum runnable proof that Agent is load-bearing: remove it from the primitive set and you can't write this example cleanly.
 
 ---
 

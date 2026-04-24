@@ -13,7 +13,8 @@ Read these in order:
 5. `docs/roadmap.md` — phased plan and current phase
 6. `docs/api-sketch.md` — what the code looks like end-to-end
 7. `docs/files.md` — the CHARTER / SOUL / SKILL / MEMORY convention
-8. `CLAUDE.md` — session protocol
+8. `docs/colony-dynamics.md` — phenomena that emerge from the primitives, and how to diagnose them
+9. `CLAUDE.md` — session protocol
 
 ## What to optimize for
 
