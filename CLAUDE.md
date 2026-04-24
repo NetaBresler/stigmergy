@@ -6,39 +6,31 @@ Before responding to ANY request in this repo, read these files in order:
 
 1. `README.md` — what Stigmergy is, status, 30-second pitch
 2. `PHILOSOPHY.md` — the thesis, the primitives, why this exists
-3. `docs/primitives.md` — the five primitives as a concrete spec
+3. `docs/primitives.md` — the six primitives as a concrete spec
 4. `docs/prior-art.md` — what already exists, what we're building differently
 5. `docs/roadmap.md` — current phase, what comes next
 6. `GETTING-STARTED.md` — brief for the first working task
 
 ## What this repo is
 
-Stigmergy is a framework for coordinating LLM agents through a shared environment with decay, rather than through a manager. This repo is the framework. It is meant to be open-source, installable, and used by other projects.
+Stigmergy is a framework for coordinating LLM agents through a shared environment with decay, rather than through a manager. This repo is the framework. It is open-source, installable, and meant to be used by other projects.
 
 ## What this repo is not
 
-- Not a factory. The first factory running on Stigmergy is a private project; it does not live here.
+- Not a product. It is generic coordination infrastructure — any product on top lives in its own repo.
 - Not a wrapper around LangGraph / CrewAI / AutoGen. Stigmergy is an alternative coordination pattern, not a prettier orchestrator.
 - Not academic. Academic prototypes exist (SwarmSys, SIER). This is meant to be installable and production-worthy.
 
 ## Current phase
 
-**Phase 0 — Design the primitive API.**
+Phase 1 is complete. The reference implementation runs; 86 tests pass against both PGlite and real Postgres; the worked example is runnable end-to-end. See `docs/roadmap.md` for what's next.
 
-Do not start implementing until the API has been sketched and the user has reviewed it. The first task is to propose TypeScript interfaces for the five primitives (Medium, Decay, Role, Locality, ValidatedReinforcement) and get the user's read on them before writing any implementation code.
+## Tech stack
 
-See `docs/roadmap.md` for phases beyond 0.
-
-## Tech stack (planned)
-
-- **Reference implementation:** TypeScript / Node (ESM, `.mts` or `.ts`)
-- **Medium substrate:** Postgres (Supabase as the dev target)
+- **Reference implementation:** TypeScript / Node (ESM), Node 22+
+- **Medium substrate:** Postgres. [PGlite](https://github.com/electric-sql/pglite) for in-process tests and demos.
 - **Testing:** Vitest
 - **Python port:** later. Not in scope for the reference implementation.
-
-## Related private context
-
-A private product factory — owned by the same user — is the first system running on Stigmergy. If the user references it (niches, colonies, Scout / Copywriter / Designer / Ad Manager / Reporter agents, Supabase tables like `colonies` or `waitlist_signups`), that's the context. The factory's Supabase schema is a useful reference for what a real Stigmergy medium looks like, but this framework must be designed to stand alone — the framework cannot depend on the factory.
 
 ## Working style
 
@@ -46,3 +38,4 @@ A private product factory — owned by the same user — is the first system run
 - Write prose before code. Spec the primitive, get sign-off, then implement.
 - Every signal in any example or implementation must have a decay story. "It's just a column in Postgres" is not a framework — it's a database. Stigmergy without decay is not Stigmergy.
 - Honesty over polish in the docs. If something doesn't work yet, say so.
+

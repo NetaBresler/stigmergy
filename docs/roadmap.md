@@ -54,20 +54,20 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 
 ---
 
-## Phase 2 — Extract real usage from the first factory
+## Phase 2 — Extract real usage from a first real project
 
-**Goal:** Use Stigmergy in anger on the first real project (a private factory owned by the user) and surface what the framework is missing.
+**Goal:** Use Stigmergy in anger on a first real project and surface what the framework is missing.
 
 **Deliverables:**
-- The private factory is ported to use `stigmergy` instead of its ad-hoc Supabase patterns.
-- A `MIGRATIONS.md` in this repo describing what had to be added, changed, or removed in Stigmergy to make that port work.
+- A first project running on `stigmergy` end-to-end (can be private; does not live in this repo).
+- A `MIGRATIONS.md` in this repo describing what had to be added, changed, or removed in the framework to make that project work.
 - Revised primitive API if Phase 1's guess was wrong about anything.
 
 **Rules for this phase:**
-- No new features in Stigmergy that aren't demanded by the real port. Speculative abstractions get rejected.
-- The private factory does not leak into this repo. This repo stays open-source and standalone.
+- No new features in Stigmergy that aren't demanded by real usage. Speculative abstractions get rejected.
+- Domain-specific code does not leak into this repo. This repo stays generic coordination infrastructure.
 
-**Done when:** The private factory runs on published-from-local Stigmergy, with zero direct Supabase queries in its agent code.
+**Done when:** A real project runs on locally-installed Stigmergy, with zero direct Supabase queries in its agent code.
 
 ---
 
