@@ -4,7 +4,7 @@ A framework for coordinating LLM agents through a shared environment with decay 
 
 ## Status
 
-Phase 1 complete. The reference implementation runs, 86 tests pass (PGlite + real Postgres), the worked example runs end-to-end, and the docs match the code. **Installable from GitHub; not yet published to npm** — awaiting its first real user (see [Roadmap](docs/roadmap.md) Phase 2). Production-ready is not yet claimed.
+Phase 1 complete. The reference implementation runs, 90 tests pass (87 under default PGlite + 3 more when `STIGMERGY_TEST_PG_URL` points at a real Postgres), the worked examples run end-to-end, and the docs match the code. **Installable from GitHub; not yet published to npm** — awaiting its first real user (see [Roadmap](docs/roadmap.md) Phase 2). Production-ready is not yet claimed.
 
 ## The 30-second pitch
 

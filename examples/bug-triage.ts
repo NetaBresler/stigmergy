@@ -134,22 +134,10 @@ async function main(): Promise<void> {
   // reinforcement via the `target` field.
   // -------------------------------------------------------------------
 
-  // Notes already processed this run. The validator dispatcher dedups
-  // on (trigger, validator), but when the verdict's `target` is a
-  // *different* signal (cross-signal reinforcement), the framework
-  // stamps the audit row with the target's id — so from the
-  // dispatcher's point of view the trigger looks unprocessed forever.
-  // Tracking processed note ids ourselves keeps the demo's boost from
-  // compounding unrealistically on the same note.
-  const processedNotes = new Set<string>();
-
   medium.defineValidator({
     name: "triage_reviewer",
     triggers: [triageNote],
     async validate(note) {
-      if (processedNotes.has(note.id)) return { approve: true }; // idempotent no-op
-      processedNotes.add(note.id);
-
       const { verdict, bug_id, bug_title, recommended_boost } = note.payload;
       const target = { type: "reported_bug", id: bug_id };
 

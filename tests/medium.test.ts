@@ -169,6 +169,50 @@ describe("defineSignal + migrate", () => {
     await expect(medium.migrate()).rejects.toThrow(/drift/i);
   });
 
+  it("refuses to migrate when decay config values change silently", async () => {
+    // Changing decay factor without changing decay kind used to pass drift
+    // detection — so a deployed colony could silently start decaying every
+    // existing signal twice as fast after a commit. This test pins the fix.
+    let medium = defineMedium({ client: pgliteClient(db) });
+    const shape = z.object({ niche: z.string() });
+    medium.defineSignal({
+      type: "tunable",
+      decay: { kind: "strength", factor: 0.9, period: "1h", floor: 0.05 },
+      shape,
+    });
+    await medium.migrate();
+
+    medium = defineMedium({ client: pgliteClient(db) });
+    medium.defineSignal({
+      type: "tunable",
+      decay: { kind: "strength", factor: 0.5, period: "1h", floor: 0.05 },
+      shape,
+    });
+    await expect(medium.migrate()).rejects.toThrow(/drift/i);
+  });
+
+  it("tolerates decay-config key order across storage round-trips", async () => {
+    // Guard against a naive JSON.stringify comparison rejecting the same
+    // config just because keys arrived in a different order.
+    let medium = defineMedium({ client: pgliteClient(db) });
+    const shape = z.object({ niche: z.string() });
+    medium.defineSignal({
+      type: "order_insensitive",
+      decay: { kind: "strength", factor: 0.9, period: "1h", floor: 0.05 },
+      shape,
+    });
+    await medium.migrate();
+
+    // Same config, but declared with a different key order in code.
+    medium = defineMedium({ client: pgliteClient(db) });
+    medium.defineSignal({
+      type: "order_insensitive",
+      decay: { period: "1h", kind: "strength", floor: 0.05, factor: 0.9 },
+      shape,
+    });
+    await expect(medium.migrate()).resolves.toBeUndefined();
+  });
+
   it("rejects invalid signal type names", () => {
     const medium = defineMedium({ client: pgliteClient(db) });
     expect(() =>

@@ -24,7 +24,10 @@ describe("migrator", () => {
     const client = pgliteClient(db);
     const result = await migrate(client, MIGRATIONS_DIR);
 
-    expect(result.applied).toEqual(["001_framework_tables.sql"]);
+    expect(result.applied).toEqual([
+      "001_framework_tables.sql",
+      "002_trigger_signal_id.sql",
+    ]);
 
     const tables = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
@@ -51,7 +54,10 @@ describe("migrator", () => {
     const rows = await client.query<{ name: string }>(
       `SELECT name FROM _stigmergy_migrations ORDER BY name`
     );
-    expect(rows.map((r) => r.name)).toEqual(["001_framework_tables.sql"]);
+    expect(rows.map((r) => r.name)).toEqual([
+      "001_framework_tables.sql",
+      "002_trigger_signal_id.sql",
+    ]);
   });
 
   it("enforces the signal-registry decay_kind check constraint", async () => {

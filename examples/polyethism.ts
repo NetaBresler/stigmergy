@@ -127,15 +127,10 @@ async function main(): Promise<void> {
   // Validator — every proposal gets a verdict; every 3rd is a strong boost.
   // -------------------------------------------------------------------
 
-  const processed = new Set<string>();
-
   medium.defineValidator({
     name: "proposal_reviewer",
     triggers: [proposal],
     async validate(signal) {
-      if (processed.has(signal.id)) return { approve: true };
-      processed.add(signal.id);
-
       approvalIndex += 1;
       const strong = approvalIndex % 3 === 0;
       const boost = strong ? 1.2 : 0.15;

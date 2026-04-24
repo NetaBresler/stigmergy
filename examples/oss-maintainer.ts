@@ -244,14 +244,6 @@ async function main(): Promise<void> {
   // Validators — the selection pressure.
   // -------------------------------------------------------------------
 
-  // Idempotency note: the dispatcher dedups on (trigger, validator),
-  // but when a verdict's `target` differs from the trigger, the audit
-  // row is written under the target's id and the trigger looks
-  // unprocessed on the next tick. We guard with an in-closure Set so
-  // the validators are honestly single-shot per trigger.
-  const processedProposals = new Set<string>();
-  const processedReplies = new Set<string>();
-
   // A fix proposal that looks solid boosts the matching bug's strength
   // so the colony keeps it loud. A weak proposal gets penalised so the
   // proposal itself fades (the bug is untouched — rejecting a weak
@@ -260,9 +252,6 @@ async function main(): Promise<void> {
     name: "fix_proposal_reviewer",
     triggers: [fixProposal],
     async validate(proposal) {
-      if (processedProposals.has(proposal.id)) return { approve: true };
-      processedProposals.add(proposal.id);
-
       const { confidence, bug_id } = proposal.payload;
       if (confidence >= 0.6) {
         return {
@@ -284,9 +273,6 @@ async function main(): Promise<void> {
     name: "draft_reply_reviewer",
     triggers: [draftReply],
     async validate(reply) {
-      if (processedReplies.has(reply.id)) return { approve: true };
-      processedReplies.add(reply.id);
-
       const { confidence } = reply.payload;
       if (confidence >= 0.55) return { approve: true, boost: 0.5 };
       return { approve: false, penalty: 0.4 };

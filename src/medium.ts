@@ -244,6 +244,16 @@ async function migrateSignal(client: MediumClient, signal: Signal): Promise<void
           `"${row.decay_kind}" does not match current code "${signal.decay.kind}".`
       );
     }
+    const storedConfig = canonicalizeDecayConfig(row.decay_config);
+    const currentConfig = canonicalizeDecayConfig(signal.decay);
+    if (storedConfig !== currentConfig) {
+      throw new Error(
+        `Schema drift detected for signal "${signal.type}": stored decay config ` +
+          `${storedConfig} does not match current code ${currentConfig}. ` +
+          `Changing decay parameters silently would alter how every existing ` +
+          `signal of this type decays — run a migration explicitly.`
+      );
+    }
     // Table already exists by constraint; nothing more to do.
     return;
   }
@@ -348,7 +358,11 @@ export function startValidatorDispatcherIfNeeded(medium: Medium): void {
   const state = mediumStates.get(medium);
   if (!state) return;
   if (state.validatorDispatcher) return;
-  state.validatorDispatcher = createValidatorDispatcher(state.client, state.validators);
+  state.validatorDispatcher = createValidatorDispatcher(
+    state.client,
+    state.validators,
+    state.signals
+  );
   state.validatorDispatcher.start();
 }
 
@@ -358,6 +372,24 @@ export function startValidatorDispatcherIfNeeded(medium: Medium): void {
  * the charter and client without threading them through every call.
  */
 const mediumStates = new WeakMap<Medium, MediumState>();
+
+/**
+ * Canonical JSON for a Decay config — sorts keys deterministically so
+ * `{ factor: 0.9, period: "1h" }` and `{ period: "1h", factor: 0.9 }`
+ * compare equal across storage round-trips.
+ */
+function canonicalizeDecayConfig(input: unknown): string {
+  if (input === null || input === undefined) return JSON.stringify(input);
+  if (typeof input !== "object") return JSON.stringify(input);
+  const record = input as Record<string, unknown>;
+  const sorted = Object.keys(record)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, k) => {
+      acc[k] = record[k];
+      return acc;
+    }, {});
+  return JSON.stringify(sorted);
+}
 
 function assertSignalRegistered(state: MediumState, signal: Signal, context: string): void {
   if (state.signals.get(signal.type) !== signal) {

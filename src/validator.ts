@@ -53,29 +53,49 @@ import type {
  * their final decayed moments) and without locality — validators are
  * privileged by design; the whole point is gating reinforcement across
  * the colony.
+ *
+ * `signalsByType` is the registry the medium maintains. When the
+ * validator asks for a type that's registered, we hydrate the full
+ * payload (same projection RoleContext.view() uses). When the type
+ * isn't registered — e.g. a validator asking for stale data — we fall
+ * back to meta-only rows rather than throwing, so old validators keep
+ * working across schema refactors.
  */
-export function buildValidatorContext(client: MediumClient): ValidatorContext {
+export function buildValidatorContext(
+  client: MediumClient,
+  signalsByType: ReadonlyMap<string, Signal>
+): ValidatorContext {
   return {
     async find<S extends Signal>(
       type: S["type"],
       _where?: unknown
     ): Promise<ReadonlyArray<DepositedSignal<S>>> {
-      // Phase 1: simple lookup by type only; filters arrive with the
-      // role-query refactor when a second caller needs them. Most
-      // validators match by trigger payload (which they already have)
-      // and only need `find` to walk to a related signal of a different
-      // type.
+      // `where` arrives with the role-query refactor when a second
+      // caller needs it. Most validators match by trigger payload
+      // (which they already have) and only need `find` to walk to a
+      // related signal of a different type.
+      const signal = signalsByType.get(type as string);
       const tableName = tableNameFor(type as string);
-      const rows = await client.query<Record<string, unknown>>(
-        `SELECT id::text AS id, created_at, origin_agent_id FROM ${quoteIdent(tableName)}`
+
+      if (!signal) {
+        const rows = await client.query<Record<string, unknown>>(
+          `SELECT id::text AS id, created_at, origin_agent_id FROM ${quoteIdent(tableName)}`
+        );
+        return rows.map((r) => ({
+          id: r.id as string,
+          type: type as S["type"],
+          payload: {} as never,
+          createdAt: r.created_at as Date,
+          originAgentId: r.origin_agent_id as string,
+        })) as ReadonlyArray<DepositedSignal<S>>;
+      }
+
+      const rows = await client.query<{ id: string }>(
+        `SELECT id::text AS id FROM ${quoteIdent(tableName)}`
       );
-      return rows.map((r) => ({
-        id: r.id as string,
-        type: type as S["type"],
-        payload: {} as never,
-        createdAt: r.created_at as Date,
-        originAgentId: r.origin_agent_id as string,
-      })) as ReadonlyArray<DepositedSignal<S>>;
+      const hydrated = await Promise.all(rows.map((r) => hydrateSignal(client, signal, r.id)));
+      const defined = hydrated.filter((d): d is DepositedSignal => d !== undefined);
+      return defined as unknown as ReadonlyArray<DepositedSignal<S>>;
     },
   };
 }
@@ -95,7 +115,10 @@ export async function applyVerdict(
   const target: VerdictTarget = verdict.target ?? { type: trigger.type, id: trigger.id };
   const approved = verdict.approve;
 
-  // Audit row — always.
+  // Audit row — always. signal_type/signal_id point at the verdict's target
+  // (what got reinforced). trigger_signal_type/trigger_signal_id point at
+  // the signal that tripped the validator, and are what the dispatcher
+  // dedups on so cross-signal verdicts don't re-fire every tick.
   const boost = approved ? (verdict.boost ?? null) : null;
   const penalty = !approved ? (verdict.penalty ?? null) : null;
   const extendUntilDelta =
@@ -103,11 +126,12 @@ export async function applyVerdict(
 
   await client.query(
     `INSERT INTO stigmergy_reinforcements
-       (signal_type, signal_id, approved, boost, penalty, extend_until, validated_by)
-     VALUES ($1, $2::uuid, $3, $4, $5, ${
+       (signal_type, signal_id, trigger_signal_type, trigger_signal_id,
+        approved, boost, penalty, extend_until, validated_by)
+     VALUES ($1, $2::uuid, $3, $4::uuid, $5, $6, $7, ${
        extendUntilDelta === null ? "NULL" : `now() + (interval '1 second' * ${extendUntilDelta})`
-     }, $6)`,
-    [target.type, target.id, approved, boost, penalty, validatorName]
+     }, $8)`,
+    [target.type, target.id, trigger.type, trigger.id, approved, boost, penalty, validatorName]
   );
 
   // Mutate the target signal's stored state. Only needed for strength-
@@ -181,6 +205,7 @@ export interface DispatcherHandle {
 export function createValidatorDispatcher(
   client: MediumClient,
   validators: ReadonlyArray<Validator>,
+  signalsByType: ReadonlyMap<string, Signal>,
   opts: DispatcherOptions = {}
 ): DispatcherHandle {
   const intervalMs = opts.intervalMs ?? 500;
@@ -189,7 +214,7 @@ export function createValidatorDispatcher(
   let timer: NodeJS.Timeout | undefined;
   let inFlight: Promise<void> = Promise.resolve();
 
-  const ctx = buildValidatorContext(client);
+  const ctx = buildValidatorContext(client, signalsByType);
 
   const singleTick = async (): Promise<void> => {
     for (const validator of validators) {
@@ -251,8 +276,8 @@ async function processValidatorSignalPair(
        FROM ${quoteIdent(tableName)} s
       WHERE NOT EXISTS (
         SELECT 1 FROM stigmergy_reinforcements r
-         WHERE r.signal_type = $1
-           AND r.signal_id = s.id
+         WHERE r.trigger_signal_type = $1
+           AND r.trigger_signal_id = s.id
            AND r.validated_by = $2
       )`,
     [signal.type, validator.name]
