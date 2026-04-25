@@ -4,7 +4,7 @@ A framework for coordinating LLM agents through a shared environment with decay 
 
 ## Status
 
-Phase 1 complete. The reference implementation runs, 86 tests pass (PGlite + real Postgres), the worked example runs end-to-end, and the docs match the code. **Installable from GitHub; not yet published to npm** — awaiting its first real user (see [Roadmap](docs/roadmap.md) Phase 2). Production-ready is not yet claimed.
+Phase 1 complete. The reference implementation runs, 90 tests pass (87 under default PGlite + 3 more when `STIGMERGY_TEST_PG_URL` points at a real Postgres), the worked examples run end-to-end, and the docs match the code. **Installable from GitHub; not yet published to npm** — awaiting its first real user (see [Roadmap](docs/roadmap.md) Phase 2). Production-ready is not yet claimed.
 
 ## The 30-second pitch
 
@@ -24,16 +24,17 @@ The package builds itself on install (via `prepare`). Node 22+. Postgres is the 
 
 ## Quick start
 
-Clone and run the worked example:
+Clone and run the worked examples:
 
 ```bash
 git clone https://github.com/NetaBresler/stigmergy
 cd stigmergy
 npm install
-npx tsx examples/niche-discovery.ts
+npx tsx examples/bug-triage.ts       # 3 agents, ~5s — the teaching ground
+npx tsx examples/oss-maintainer.ts   # 10 agents, ~25s — the showcase
 ```
 
-You'll see a three-agent colony (Scout, Worker, Validator) deposit signals, compete for claims, and reinforce the winning pheromones while the weak ones decay. See [`examples/README.md`](examples/README.md) for what's happening.
+`bug-triage.ts` walks a Reporter, two Triagers, and a Validator through every primitive — strength decay, claim races, cross-signal reinforcement — in about 240 lines. `oss-maintainer.ts` is the same framework turned up to ten agents across three simulated sensor streams; the summary at the bottom shows emergent specialization with no planner. See [`examples/README.md`](examples/README.md) for what's happening.
 
 ## Why this exists
 
@@ -47,6 +48,7 @@ We're building that tool.
 - [`docs/primitives.md`](docs/primitives.md) — the six primitives that make a system stigmergic.
 - [`docs/files.md`](docs/files.md) — the CHARTER / SOUL / SKILL / MEMORY convention.
 - [`docs/api-sketch.md`](docs/api-sketch.md) — what the code looks like end-to-end.
+- [`docs/colony-dynamics.md`](docs/colony-dynamics.md) — phenomena that emerge from the primitives, and how to diagnose them.
 - [`docs/prior-art.md`](docs/prior-art.md) — what exists, with citations.
 - [`docs/roadmap.md`](docs/roadmap.md) — what we're building, in phases.
 

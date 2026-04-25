@@ -43,11 +43,12 @@ A stigmergic agent system has a small number of required ingredients. Cross-refe
 
 1. **A shared medium.** One place agents read from and write to. A database, a filesystem, an artifact. This is the *only* coordination channel — if agents start messaging each other directly, you've re-invented the manager.
 2. **Decay.** Every signal evaporates unless reinforced. A task marked "in progress" three days ago by an agent that crashed shouldn't still repel other agents from picking it up. This is the hardest part, and it's the part everyone who tries to do this in a database gets wrong.
-3. **Role specialization.** Not strictly required (ants are homogeneous), but it accelerates convergence. SwarmSys uses Explorers, Workers, Validators. A colony-as-factory might use Scout, Writer, Designer, Launcher, Reporter, Decider. Each agent knows what kind of work it does.
-4. **Locality.** Agents read only what's near them in the medium — a slice, a query, a directory — not the whole world. This is what stops them from becoming managers. You cannot micro-manage what you cannot see.
-5. **Validated reinforcement.** Not every trace reinforces equally. Successful outcomes deposit more signal than mere activity. Without this, noise wins.
+3. **Role specialization.** Not strictly required (ants are homogeneous), but it accelerates convergence. SwarmSys uses Explorers, Workers, Validators. A colony-as-factory might use Scout, Writer, Designer, Launcher, Reporter, Decider. Each role knows what kind of work it does.
+4. **Agent.** The stable identity that enacts roles — distinct from the role itself. An ant has a fixed identity (genome, morphology, accumulated memory) and performs different functions over its life as colony needs shift; the biology term is *polyethism*. Collapsing Agent into Role forces a bad choice: either every role change creates a new agent (no polyethism), or agents accumulate every role's state at once (no locality). Keeping them separate lets both work.
+5. **Locality.** Agents read only what's near them in the medium — a slice, a query, a directory — not the whole world. This is what stops them from becoming managers. You cannot micro-manage what you cannot see.
+6. **Validated reinforcement.** Not every trace reinforces equally. Successful outcomes deposit more signal than mere activity. Without this, noise wins.
 
-That's it. No manager. No orchestrator. No central plan. The coordination is *in the medium*, not *in an agent*.
+That's it. Six ingredients. No manager. No orchestrator. No central plan. The coordination is *in the medium*, not *in an agent*.
 
 We are building this as a framework. We call it **Stigmergy** (capital S), because it is a direct port of the biological principle — same name, same mechanics, new substrate. Where the word appears lowercase in this document, we mean the biological phenomenon. Where it appears capitalized, we mean the framework.
 
@@ -83,9 +84,13 @@ A knowledge base tells an agent *what is true*. A medium tells an agent *what to
 
 ## A worked example
 
-We're building Stigmergy because we needed it. The first system running on it is a digital product factory — niches in, validated products out — where the Supabase project is the medium, and a handful of specialized agents (Scout, Copywriter, Designer, Ad Manager, Reporter) work against it without any central orchestrator. Colonies are rows in a table. Demand signal lives as aggregate pheromone in another table. Past failures reshape future searches through a learning log — qualitative stigmergy in plain markdown.
+The `examples/` directory in this repo has two colonies you can run end-to-end against in-process Postgres. No install, no API keys — just `npx tsx`.
 
-That factory is private. Stigmergy, the framework underneath it, is this repo. One is a product; the other is the pattern. We're publishing the pattern because we think it has a life beyond any one implementation of it.
+`bug-triage.ts` is the teaching ground: three agents, one medium, every primitive exercised in about 240 lines. A Reporter files bugs, two Triagers compete for claims, a Validator reinforces real bugs and penalises noise. You can watch strength decay, watch the claim race, watch signals evaporate.
+
+`oss-maintainer.ts` is the showcase. Ten agents keeping an open-source project healthy — three sensor agents translating simulated GitHub / community / social events into signals, three Triagers, two Responders, two Reviewers, and a Broadcaster announcing merges. Nobody assigns anyone to a component. Over ~25 seconds of wall time, the colony visibly specializes — one Triager trends frontend, another trends backend, purely because claims plus validator reinforcement route the work on their own.
+
+Both run against the same reference implementation that ships in `src/`. If you want to see what Stigmergy feels like before reading another word of theory, run them.
 
 ## The hard parts — and why decay is the one that kills you
 
@@ -115,7 +120,7 @@ This repo is our attempt to close it.
 
 ## The claim
 
-Agent systems that scale will look less like corporations and more like colonies. Not because biology is pretty, but because the math is better: linear coordination cost, no manager bottleneck, graceful failure, automatic forgetting, emergent specialization. The primitives are small — a shared medium, decay, roles, locality, validated reinforcement — and none of them are exotic.
+Agent systems that scale will look less like corporations and more like colonies. Not because biology is pretty, but because the math is better: linear coordination cost, no manager bottleneck, graceful failure, automatic forgetting, emergent specialization. The primitives are small — a shared medium, decay, roles, agents, locality, validated reinforcement — and none of them are exotic.
 
 Stigmergy is our bet on those primitives: a small, careful porting of a 200-million-year-old coordination pattern onto a substrate — LLMs writing to a Postgres database — that it has never lived in at production scale before.
 

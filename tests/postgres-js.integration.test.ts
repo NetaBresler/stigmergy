@@ -2,7 +2,7 @@ import postgres from "postgres";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { postgresJsClient } from "../src/adapters/postgres.js";
-import { defineMedium, upsertAgentId } from "../src/medium.js";
+import { defineMedium, mediumState, upsertAgentId } from "../src/medium.js";
 import { buildRoleContext } from "../src/role.js";
 import { createValidatorDispatcher } from "../src/validator.js";
 
@@ -144,7 +144,8 @@ describe.skipIf(!PG_URL)("postgres-js adapter (real Postgres)", () => {
       body: "promising",
     });
 
-    const dispatcher = createValidatorDispatcher(client, [validator]);
+    const signals = mediumState(medium)?.signals ?? new Map();
+    const dispatcher = createValidatorDispatcher(client, [validator], signals);
     await dispatcher.tick();
     await dispatcher.stop();
 
