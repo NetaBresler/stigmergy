@@ -1,0 +1,28 @@
+{
+  "name": "stigmergy-video",
+  "version": "0.0.0",
+  "description": "Remotion video explaining Stigmergy, with ElevenLabs narration.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "narrate": "tsx scripts/generate-narration.ts",
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts StigmergyExplainer out/stigmergy.mp4",
+    "build": "npm run narrate && npm run render",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.260",
+    "@remotion/renderer": "4.0.260",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.260"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
