@@ -31,6 +31,14 @@ npm run render
 
 The first render also pulls Chrome Headless Shell (~88 MB). Subsequent renders are cached.
 
+## Render in GitHub Actions
+
+There's a workflow at `.github/workflows/render-video.yml` that does the same thing on a runner — useful when you can't reach `api.elevenlabs.io` from your local environment.
+
+1. Add a repo secret named `ELEVENLABS_API_KEY`.
+2. Actions → **Render Stigmergy explainer** → **Run workflow**.
+3. When it finishes, the MP4 is attached to a GitHub Release (`video-<run-number>`) and uploaded as a workflow artifact. The job summary prints both URLs.
+
 ## Iterate visually
 
 ```bash

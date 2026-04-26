@@ -1,0 +1,68 @@
+name: Render Stigmergy explainer
+
+# Manually triggered. Uses the ELEVENLABS_API_KEY repo secret to fetch
+# narration, renders the video with Remotion, and publishes the MP4 as
+# both a workflow artifact and a GitHub Release so it has a stable URL.
+on:
+  workflow_dispatch:
+    inputs:
+      voice_id:
+        description: 'ElevenLabs voice id'
+        required: false
+        default: JBFqnCBsd6RMkjVDRZzb
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: video/package-lock.json
+
+      - name: Install dependencies
+        working-directory: video
+        run: npm ci
+
+      - name: Generate narration via ElevenLabs
+        working-directory: video
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ inputs.voice_id }}
+        run: |
+          if [ -z "$ELEVENLABS_API_KEY" ]; then
+            echo "::error::ELEVENLABS_API_KEY repo secret is not set."
+            exit 1
+          fi
+          npm run narrate -- --force
+
+      - name: Render video
+        working-directory: video
+        run: npm run render
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stigmergy-explainer-${{ github.run_number }}
+          path: video/out/stigmergy.mp4
+          retention-days: 30
+
+      - name: Publish as GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="video-${{ github.run_number }}"
+          gh release create "$tag" \
+            video/out/stigmergy.mp4 \
+            --title "Stigmergy explainer · build ${{ github.run_number }}" \
+            --notes "Rendered from commit \`${{ github.sha }}\` on branch \`${{ github.ref_name }}\`."
+          echo "## Stigmergy explainer rendered" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Direct MP4:** https://github.com/${{ github.repository }}/releases/download/$tag/stigmergy.mp4" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Release page:** https://github.com/${{ github.repository }}/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
