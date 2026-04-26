@@ -13,9 +13,11 @@ export const Hierarchy: React.FC = () => {
   const diagramIn = interpolate(frame, [fps * 0.4, fps * 1.2], [0, 1], {
     extrapolateRight: "clamp",
   });
-  const overlayIn = interpolate(frame, [fps * 9, fps * 10], [0, 1], {
+  const overlayIn = interpolate(frame, [fps * 6, fps * 7], [0, 1], {
     extrapolateRight: "clamp",
   });
+  // Manager pulses red whenever a packet arrives.
+  const managerStress = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(frame / 8));
 
   const cx = width / 2;
   const managerY = 360;
@@ -61,6 +63,20 @@ export const Hierarchy: React.FC = () => {
           );
         })}
 
+        {/* Stress halo around the manager — visualises the bottleneck. */}
+        <circle
+          cx={cx}
+          cy={managerY}
+          r={170}
+          fill={COLORS.red}
+          opacity={managerStress * 0.18}
+          filter="url(#blur-stress)"
+        />
+        <defs>
+          <filter id="blur-stress">
+            <feGaussianBlur stdDeviation="20" />
+          </filter>
+        </defs>
         <Node x={cx} y={managerY} label="MANAGER" muted={false} accent />
         {workerXs.map((wx, i) => (
           <Node key={i} x={wx} y={workerY} label={`AGENT ${i + 1}`} muted />

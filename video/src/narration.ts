@@ -25,38 +25,38 @@ export type SceneScript = {
 export const SCRIPT: SceneScript[] = [
   {
     id: "title",
-    text: "Stigmergy. A framework for coordinating language model agents through a shared environment with decay.",
-    fallbackSeconds: 6,
+    text: "Stigmergy. Coordinating language model agents through a shared environment with decay.",
+    fallbackSeconds: 5,
   },
   {
     id: "hierarchy",
-    text: "Almost every multi-agent framework shipping today encodes the same assumption. If you want many agents to work together, give them a manager. The manager delegates, collects output, plans again. It works for a handful of agents, and it plateaus hard past five or six. The manager becomes a context-window-shaped bottleneck.",
-    fallbackSeconds: 18,
-  },
-  {
-    id: "termites",
-    text: "In nineteen fifty-nine, the biologist Pierre-Paul Grassé watched termites rebuild a damaged nest. They weren't talking. They weren't taking orders. Each one worked as if alone. Yet together they built a cathedral.",
-    fallbackSeconds: 14,
-  },
-  {
-    id: "principle",
-    text: "He called it stigmergy. Work that guides work. The shape of what already exists tells the next agent what belongs next.",
-    fallbackSeconds: 10,
-  },
-  {
-    id: "medium",
-    text: "Stigmergy replaces the manager with a shared medium. Agents read from it, deposit signals as they work, and the next agent picks up whatever the medium suggests it should do next.",
+    text: "Almost every multi-agent framework today gives the agents a manager. The manager delegates, collects output, plans again. It works for five or six agents — then plateaus. The manager is a context-window-shaped bottleneck.",
     fallbackSeconds: 13,
   },
   {
-    id: "decay",
-    text: "Stale signals evaporate. Plans that aren't working simply fade. You don't tell the colony to reconsider — pheromones that aren't reinforced just disappear.",
+    id: "termites",
+    text: "Nineteen fifty-nine. Pierre-Paul Grassé watches termites rebuild a nest. No conversation. No orders. Each one works as if alone — and together, they build a cathedral.",
     fallbackSeconds: 11,
   },
   {
+    id: "principle",
+    text: "He called it stigmergy. Work that guides work. The shape of what exists tells the next agent what belongs next.",
+    fallbackSeconds: 9,
+  },
+  {
+    id: "medium",
+    text: "Stigmergy replaces the manager with a shared medium. Agents read from it, deposit signals as they work, and the next agent picks up whatever the medium suggests.",
+    fallbackSeconds: 11,
+  },
+  {
+    id: "decay",
+    text: "Stale signals evaporate. Plans that aren't working fade. Pheromones that aren't reinforced disappear.",
+    fallbackSeconds: 8,
+  },
+  {
     id: "primitives",
-    text: "Six primitives. A shared medium. Decay. Roles. Agents. Locality. And validated reinforcement. Six ingredients. No manager. No orchestrator. The coordination lives in the medium, not in any single agent.",
-    fallbackSeconds: 16,
+    text: "Six primitives. Medium. Decay. Roles. Agents. Locality. Validated reinforcement. No manager. No orchestrator. The coordination lives in the medium.",
+    fallbackSeconds: 12,
   },
   {
     id: "claim",

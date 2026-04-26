@@ -93,26 +93,47 @@ export const Termites: React.FC = () => {
         })}
 
         {/* Wandering "termites" — independent random walkers on the mound. */}
-        {Array.from({ length: 6 }).map((_, i) => {
+        {Array.from({ length: 8 }).map((_, i) => {
           const seed = i * 37 + 13;
-          const phase = frame / 12 + i * 1.7;
-          const x = width / 2 + Math.sin(phase) * (220 - i * 20);
+          const phase = frame / 14 + i * 1.7;
+          const orbit = 240 - (i % 4) * 35;
+          const x = width / 2 + Math.sin(phase) * orbit;
           const reachedLayers = Math.min(
             layers,
             Math.max(0, Math.floor((frame - fps * 1.2) / 5)),
           );
-          const y = groundY - Math.max(8, reachedLayers * layerHeight) + Math.sin(phase * 2) * 6;
+          const baseY = groundY - Math.max(8, reachedLayers * layerHeight);
+          const y = baseY + Math.sin(phase * 2.4) * 10;
+          // Brief amber flash when a termite "deposits" (every ~1.2s, phased).
+          const depositPhase = (frame + i * 11) % (fps * 1.2);
+          const depositing = depositPhase < 6;
           return (
-            <circle
-              key={i}
-              cx={x}
-              cy={y - 14}
-              r={5}
-              fill={COLORS.ink}
-              opacity={0.85 - (seed % 5) * 0.05}
-            />
+            <g key={i}>
+              {depositing && (
+                <circle
+                  cx={x}
+                  cy={y - 14}
+                  r={14}
+                  fill={COLORS.amber}
+                  opacity={0.5}
+                  filter="url(#blur-termite)"
+                />
+              )}
+              <circle
+                cx={x}
+                cy={y - 14}
+                r={5}
+                fill={depositing ? COLORS.amber : COLORS.ink}
+                opacity={0.9 - (seed % 5) * 0.05}
+              />
+            </g>
           );
         })}
+        <defs>
+          <filter id="blur-termite">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+        </defs>
       </svg>
 
       <div

@@ -64,9 +64,13 @@ export const Decay: React.FC = () => {
       <svg width={width} height={height} style={{ position: "absolute", inset: 0 }}>
         {signals.map((s, i) => {
           const rowY = 380 + i * 130;
-          // Reinforced signal stays at ~1.0 — actually pulses higher.
+          // Reinforced signal pulses up sharply when validator hits it,
+          // then settles. The other signals decay smoothly.
+          const reinforcePeriod = fps * 2; // ~2s between validator hits
+          const tickPhase = (frame % reinforcePeriod) / reinforcePeriod;
+          const reinforceKick = Math.exp(-tickPhase * 6) * 0.15;
           const strength = s.reinforced
-            ? 0.95 + 0.05 * Math.sin(frame / 8)
+            ? Math.min(1, 0.85 + reinforceKick + 0.05 * Math.sin(frame / 4))
             : Math.max(0.05, Math.pow(0.9, t * 30));
           const opacity = s.reinforced ? 1 : Math.max(0.2, strength + 0.2);
           const barW = 1100 * strength;

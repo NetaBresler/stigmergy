@@ -1,5 +1,12 @@
 import { AbsoluteFill, Audio, Sequence, staticFile } from "remotion";
 import type { CalculateMetadataFunction } from "remotion";
+import {
+  TransitionSeries,
+  linearTiming,
+} from "@remotion/transitions";
+import { fade } from "@remotion/transitions/fade";
+import { AmbientField } from "./AmbientField";
+import { COLORS } from "./theme";
 import { FPS, SCRIPT, type SceneId } from "./narration";
 import { Title } from "./scenes/Title";
 import { Hierarchy } from "./scenes/Hierarchy";
@@ -23,7 +30,8 @@ const SCENE_COMPONENTS: Record<SceneId, React.FC> = {
 
 // Padding lets each scene's visuals breathe past the end of the audio so
 // the cut doesn't feel rushed. Tuned by feel, not by math.
-const SCENE_TAIL_PADDING_SECONDS = 0.6;
+const SCENE_TAIL_PADDING_SECONDS = 0.5;
+const TRANSITION_FRAMES = 12; // ~0.4s crossfade between scenes.
 
 export type SceneTiming = {
   id: SceneId;
@@ -36,27 +44,36 @@ export type CompositionProps = {
 };
 
 export const StigmergyExplainer: React.FC<CompositionProps> = ({ scenes }) => {
-  let cursor = 0;
   return (
-    <AbsoluteFill>
-      {scenes.map((scene) => {
-        const Scene = SCENE_COMPONENTS[scene.id];
-        const start = cursor;
-        cursor += scene.durationInFrames;
-        return (
-          <Sequence
-            key={scene.id}
-            from={start}
-            durationInFrames={scene.durationInFrames}
-            name={scene.id}
-          >
-            <Scene />
-            {scene.hasAudio && (
-              <Audio src={staticFile(`narration/${scene.id}.mp3`)} />
-            )}
-          </Sequence>
-        );
-      })}
+    <AbsoluteFill style={{ backgroundColor: COLORS.bg }}>
+      <TransitionSeries>
+        {scenes.flatMap((scene, i) => {
+          const Scene = SCENE_COMPONENTS[scene.id];
+          const items = [
+            <TransitionSeries.Sequence
+              key={scene.id}
+              durationInFrames={scene.durationInFrames}
+            >
+              <Scene />
+              {scene.hasAudio && (
+                <Audio src={staticFile(`narration/${scene.id}.mp3`)} />
+              )}
+            </TransitionSeries.Sequence>,
+          ];
+          if (i < scenes.length - 1) {
+            items.push(
+              <TransitionSeries.Transition
+                key={`${scene.id}-to-next`}
+                presentation={fade()}
+                timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+              />,
+            );
+          }
+          return items;
+        })}
+      </TransitionSeries>
+      {/* Constant low-amplitude motion across the whole video. */}
+      <AmbientField density={20} opacity={0.12} />
     </AbsoluteFill>
   );
 };
@@ -91,9 +108,12 @@ export const calculateMetadata: CalculateMetadataFunction<CompositionProps> = as
     };
   });
 
-  const total = scenes.reduce((s, sc) => s + sc.durationInFrames, 0);
+  // TransitionSeries shortens the visible runtime by one transition's worth
+  // per join (the outgoing tail overlaps the incoming head).
+  const sceneTotal = scenes.reduce((s, sc) => s + sc.durationInFrames, 0);
+  const overlap = (scenes.length - 1) * TRANSITION_FRAMES;
   return {
-    durationInFrames: total,
+    durationInFrames: Math.max(1, sceneTotal - overlap),
     props: { scenes },
   };
 };
