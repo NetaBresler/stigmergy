@@ -112,11 +112,12 @@ async function fetchScene(
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_multilingual_v2",
+        // eleven_v3 (alpha) — more expressive, better prosody for explainer narration.
+        model_id: "eleven_v3",
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
-          style: 0.15,
+          style: 0.0,
           use_speaker_boost: true,
         },
       }),
@@ -141,7 +142,9 @@ async function alreadyHave(file: string): Promise<boolean> {
 async function main(): Promise<void> {
   await loadDotenv();
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? "JBFqnCBsd6RMkjVDRZzb";
+  // Default voice: "Brian" — calm, deep, narrator-style. Fits the contemplative
+  // tone of the explainer better than a conversational voice.
+  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? "nPczCjzI2devNBz1zQrb";
   if (!apiKey) {
     throw new Error(
       "ELEVENLABS_API_KEY is not set. Copy video/.env.example to video/.env and fill it in.",

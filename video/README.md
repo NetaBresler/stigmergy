@@ -51,7 +51,11 @@ npm run narrate -- --force   # re-fetch all scenes
 
 ## Choosing a different voice
 
-Set `ELEVENLABS_VOICE_ID` in `.env`. The default is `JBFqnCBsd6RMkjVDRZzb` ("George"). Browse voices in the ElevenLabs voice library.
+Set `ELEVENLABS_VOICE_ID` in `.env`. The default is `nPczCjzI2devNBz1zQrb` ("Brian" — calm narrator). Browse voices in the ElevenLabs voice library.
+
+## Model
+
+The generator uses ElevenLabs' `eleven_v3` model. Override by editing `scripts/generate-narration.ts` if you want a different model (`eleven_multilingual_v2`, `eleven_turbo_v2_5`, etc.).
 
 ## Layout
 
