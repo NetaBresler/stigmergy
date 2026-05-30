@@ -1,6 +1,6 @@
 # Stigmergy examples
 
-Three self-contained colonies that show what the framework does and why. All run entirely against in-process [PGlite](https://github.com/electric-sql/pglite) — no Postgres install, no API keys.
+Self-contained colonies that show what the framework does and why. The first four run entirely against in-process [PGlite](https://github.com/electric-sql/pglite) — no Postgres install, no API keys. The fifth (`remote-colony/`) is the multi-process deployment shape and wants a real Postgres.
 
 ## Running
 
@@ -20,7 +20,10 @@ Then any of:
 npx tsx examples/bug-triage.ts       # 3 agents, ~5s run, every primitive once
 npx tsx examples/polyethism.ts       # 1 agent, 2 roles, role-drift in action
 npx tsx examples/oss-maintainer.ts   # 10 agents, ~25s run, emergent specialization
+npx tsx examples/remote-agent.ts     # 3 agents over HTTP, one process, zero setup
 ```
+
+The `remote-colony/` directory is the same colony again, but split across processes — a server you run, agents you run separately, one of them in Python. It needs a real Postgres; see [`remote-colony/README.md`](remote-colony/README.md).
 
 ---
 
@@ -111,6 +114,20 @@ Each role reads exactly one signal type (Phase 1 constraint) — TriagerRole rea
 The "emergent specialization" is genuine, not scripted. Claims are atomic — two Triagers seeing the same top-strength bug race for `tryClaim`, exactly one wins. The agent that wins gets its affinity reinforced for that component, biasing its next pick. In a real colony this bias would live in each agent's MEMORY.md and update during the consolidation pass; the example keeps it in closure state so the demo doesn't write files.
 
 ---
+
+## `remote-agent.ts` — the colony over HTTP, in one process
+
+The bug-triage colony again, but the three agents talk to the medium through the **server and client SDK** instead of running in-process. One process plays both server and clients so it stays a single `npx tsx` command, but the path is real HTTP over the loopback: each agent authenticates with a token, asks the server for its role's slice, and deposits — never touching the database, never seeing SQL, never seeing the other agents.
+
+### What to watch for
+
+- **Agents connect with `connect({ url, token })`.** The handler holds a `session` instead of a `ctx`, but `session.as("Triager").view()` reads the same as the in-process `ctx.as(TriagerRole).view()`.
+- **The validator runs server-side.** The boosts in the output come from the server's background worker, not from any agent.
+- **Same emergent landscape.** The final pressure block is identical in spirit to `bug-triage.ts` — coordination through the medium doesn't care whether the agents are local or remote.
+
+## `remote-colony/` — agents in their own processes (incl. Python)
+
+The deployment shape. A `server.ts` you run in one terminal; a TypeScript `agent.ts` and a **pure-stdlib `agent.py`** you run in others. The Python triager and the TypeScript triager compete for the same claims through the medium — proof that the colony is reachable from any language, because the API is just JSON over HTTP. Needs a real Postgres (a Supabase free-tier db works). Full walkthrough in [`remote-colony/README.md`](remote-colony/README.md); protocol reference in [`docs/connect.md`](../docs/connect.md).
 
 ## Writing your own
 

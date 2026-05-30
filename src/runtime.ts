@@ -1,30 +1,31 @@
 import { buildAgentContext } from "./agent.js";
-import { sweepSignal } from "./decay.js";
-import {
-  mediumState,
-  resolvedCharter,
-  startValidatorDispatcherIfNeeded,
-  tableNameFor,
-} from "./medium.js";
-import type { Agent, AgentHandler, Medium, MediumClient, Role, Signal } from "./types.js";
+import { mediumState, resolvedCharter } from "./medium.js";
+import type { Agent, AgentHandler, Medium, Role } from "./types.js";
+import { ensureWorkers } from "./workers.js";
+
+// Re-exported for backwards compatibility — the implementation now lives in
+// src/workers.ts alongside the rest of the background-worker machinery.
+export { sweepAllSignals } from "./workers.js";
 
 /**
- * Runtime — the agent loop and medium-level maintenance.
+ * Runtime — the in-process agent loop.
  *
- * `runAgent(medium, agent, handler, opts)` invokes the handler
- * periodically, constructing a fresh AgentContext each tick. Validator
- * dispatch and decay sweep are per-medium singletons started lazily
- * the first time any agent runs; both stop when `medium.close()` is
- * called.
+ * `runAgent(medium, agent, handler, opts)` invokes the handler periodically,
+ * constructing a fresh AgentContext each tick. The colony's background workers
+ * (decay sweep + validator dispatch) are started lazily via `ensureWorkers`
+ * the first time any agent runs; both stop when `medium.close()` is called.
  *
  * Design choices:
- *   - One handler invocation per tick, not parallel within a tick. If
- *     the handler is slow, the next tick waits — back-pressure over
- *     concurrency is what a stigmergic system wants: tokens are
- *     expensive, and the medium is where the urgency lives.
- *   - Sweep runs at its own cadence, not per handler tick. Decay
- *     cleanup shouldn't stall agent work.
+ *   - One handler invocation per tick, not parallel within a tick. If the
+ *     handler is slow, the next tick waits — back-pressure over concurrency is
+ *     what a stigmergic system wants: tokens are expensive, and the medium is
+ *     where the urgency lives.
+ *   - Sweep and dispatch run on their own cadence in the background, not per
+ *     handler tick.
  *   - Abort via `medium.close()`. The run promise resolves cleanly.
+ *
+ * For agents that live outside this process, see `serve()` (src/server) and
+ * `connect()` (src/client) — the network equivalent of this loop.
  */
 
 export interface RunOptions {
@@ -52,13 +53,14 @@ export async function runAgent<A extends Agent<ReadonlyArray<Role>>>(
   }
 
   const intervalMs = opts.intervalMs ?? 1000;
-  const sweepIntervalMs = opts.sweepIntervalMs ?? 5000;
   const client = state.client;
   const charter = resolvedCharter(medium);
 
-  // Kick off the per-medium singletons on first run.
-  startValidatorDispatcherIfNeeded(medium);
-  startSweepLoopIfNeeded(medium, state, sweepIntervalMs);
+  // Kick off the per-medium background workers on first run.
+  ensureWorkers(
+    medium,
+    opts.sweepIntervalMs === undefined ? {} : { sweepIntervalMs: opts.sweepIntervalMs }
+  );
 
   let ticks = 0;
   while (!state.closed) {
@@ -69,8 +71,8 @@ export async function runAgent<A extends Agent<ReadonlyArray<Role>>>(
     try {
       await handler(ctx);
     } catch (err) {
-      // Propagate after logging; a crashing handler stops that agent
-      // but does not stop the colony. The medium stays up.
+      // Propagate after logging; a crashing handler stops that agent but does
+      // not stop the colony. The medium stays up.
       console.error(`[stigmergy] agent "${agent.id}" handler threw:`, err);
       throw err;
     }
@@ -80,59 +82,10 @@ export async function runAgent<A extends Agent<ReadonlyArray<Role>>>(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Sweep loop — per-medium singleton, started lazily
-// ---------------------------------------------------------------------------
-
-const mediumSweepState = new WeakMap<Medium, { started: boolean }>();
-
-function startSweepLoopIfNeeded(
-  medium: Medium,
-  state: ReturnType<typeof mediumState> & object,
-  intervalMs: number
-): void {
-  let tracker = mediumSweepState.get(medium);
-  if (!tracker) {
-    tracker = { started: false };
-    mediumSweepState.set(medium, tracker);
-  }
-  if (tracker.started) return;
-  tracker.started = true;
-
-  void (async () => {
-    while (!state.closed) {
-      await sleep(intervalMs, () => state.closed);
-      if (state.closed) break;
-      try {
-        await sweepAllSignals(state.client, state.signals.values());
-      } catch (err) {
-        console.error("[stigmergy] sweep loop errored:", err);
-      }
-    }
-  })();
-}
-
 /**
- * Sweep every registered signal type. Exported for tests that want
- * deterministic decay application without waiting for the loop.
- */
-export async function sweepAllSignals(
-  client: MediumClient,
-  signals: Iterable<Signal>
-): Promise<void> {
-  for (const signal of signals) {
-    await sweepSignal(client, signal.type, tableNameFor(signal.type), signal.decay);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Sleep that resolves early when the stop predicate becomes true.
- * Polls every 25ms so medium.close() causes prompt shutdown without
- * dragging out the whole interval.
+ * Sleep that resolves early when the stop predicate becomes true. Polls every
+ * 25ms so medium.close() causes prompt shutdown without dragging out the whole
+ * interval.
  */
 async function sleep(ms: number, stopped: () => boolean): Promise<void> {
   const slice = 25;

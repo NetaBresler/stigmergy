@@ -124,15 +124,23 @@ export async function applyVerdict(
   const extendUntilDelta =
     approved && "extend" in verdict && verdict.extend ? durationSeconds(verdict.extend) : null;
 
-  await client.query(
+  // ON CONFLICT DO NOTHING against the unique index over the trigger columns
+  // (migration 003) makes this exactly-once even if two dispatcher instances
+  // race past their NOT-EXISTS pre-check. If the insert finds no row to
+  // return, another instance already recorded this verdict — so we must NOT
+  // mutate the target a second time, or we'd double-apply the boost/penalty.
+  const inserted = await client.query<{ id: string }>(
     `INSERT INTO stigmergy_reinforcements
        (signal_type, signal_id, trigger_signal_type, trigger_signal_id,
         approved, boost, penalty, extend_until, validated_by)
      VALUES ($1, $2::uuid, $3, $4::uuid, $5, $6, $7, ${
        extendUntilDelta === null ? "NULL" : `now() + (interval '1 second' * ${extendUntilDelta})`
-     }, $8)`,
+     }, $8)
+     ON CONFLICT (trigger_signal_type, trigger_signal_id, validated_by) DO NOTHING
+     RETURNING id::text`,
     [target.type, target.id, trigger.type, trigger.id, approved, boost, penalty, validatorName]
   );
+  if (inserted.length === 0) return;
 
   // Mutate the target signal's stored state. Only needed for strength-
   // and expiry-decay kinds; reinforcement-decay signals derive their

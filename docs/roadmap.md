@@ -24,7 +24,7 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 
 ---
 
-## Phase 1 — Reference implementation *(current phase)*
+## Phase 1 — Reference implementation *(complete)*
 
 **Goal:** A working `stigmergy` npm package that runs against Postgres (Supabase-compatible) and implements the primitives spec'd in Phase 0.
 
@@ -51,6 +51,23 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 - API stays unchanged from Phase 0 unless a real implementation problem forces a revision; if it does, document the revision in `docs/api-sketch.md` before writing the code.
 
 **Done when:** `npm install stigmergy` (local, not yet published) gives a developer everything they need to define a colony, run it, and watch signals decay.
+
+---
+
+## Phase 1.5 — The network layer *(complete)*
+
+**Goal:** Let agents that live outside the medium's process — a different service, a different language, a serverless function — join a colony. The embedded `medium.run()` requires the agent to be in-process TypeScript; real deployments don't look like that.
+
+**Why this came before Phase 2, not after:** "use it on a real project" (Phase 2) is hard to do honestly while the only way to write an agent is to embed it next to the database. The network boundary is a precondition for real usage, not a speculative abstraction — and building it turned locality from a convention into an enforced property, which is squarely on-thesis.
+
+**Deliverables (all shipped):**
+- `src/server/` — an HTTP server (`serve(medium, opts)`) over Node's built-in `http`, no new dependencies. Owns the medium, runs the background workers, exposes the role-bounded operations. Locality is enforced at the trust boundary: an authenticated agent gets exactly its role's `localQuery` slice, can only deposit to its role's writes, and can only act as roles it was declared with.
+- `src/client/` — a typed TypeScript SDK (`connect({ url, token })`) whose surface mirrors the in-process `RoleContext` almost verbatim, plus a `session.run()` poll loop.
+- A documented JSON-over-HTTP wire protocol (`docs/connect.md`) any language speaks — proven by a ~70-line pure-stdlib Python agent that competes for claims against a TypeScript one.
+- Bearer-token auth (`issueToken` / `revokeToken`, sha256-hashed at rest) and a `stigmergy` CLI (`migrate` / `serve` / `token` / `inspect`).
+- Multi-instance safety: lease-based leader election for the sweep and dispatch workers, and a database-enforced exactly-once guarantee for validator verdicts (unique index + `ON CONFLICT`), so you can run the server horizontally.
+
+**Deliberately still open** (documented, not pretended away): server-push wakeups (agents poll today), built-in rate limiting (use a proxy), and `LISTEN/NOTIFY` scheduling. See the "What this is not (yet)" section of `docs/connect.md`.
 
 ---
 
@@ -95,5 +112,5 @@ These are deliberately out of scope until the roadmap above is complete:
 - **Python port.** The reference implementation is TypeScript. A Python port is welcome later; it is not a Phase 0–3 concern.
 - **Non-Postgres mediums.** Filesystem, Redis, S3, graph databases — all interesting, all possible, all later. Postgres first because it is the cheapest substrate to build and debug against.
 - **Decentralized / peer-to-peer stigmergy.** The Ledger-State Stigmergy paper is inspirational, but on-chain is not a Phase 1 target.
-- **Managed hosting.** Stigmergy is a library. If someone wants to host "Stigmergy-as-a-service" later, that is a separate project.
+- **Managed hosting.** Stigmergy ships a server you run yourself (Phase 1.5) — that's a library feature, the boundary that makes locality enforceable across processes. A hosted *"Stigmergy-as-a-service"* with billing, tenancy, and an ops team is still a separate project and still out of scope here.
 - **Direct integration with a specific agent framework** (LangGraph, CrewAI, Agent Teams). Stigmergy is a coordination primitive; it composes with anything that can read and write the medium. Integrations are examples, not core.

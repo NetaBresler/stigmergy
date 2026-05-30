@@ -336,9 +336,10 @@ export interface Medium {
   /**
    * Developer escape hatch for inspection only. Raw read across the
    * medium, unavailable inside agent handlers. Use for debugging,
-   * dashboards, and tests.
+   * dashboards, and tests. The optional type parameter shapes the rows;
+   * it defaults to a generic record.
    */
-  query(sql: string): Promise<ReadonlyArray<Record<string, unknown>>>;
+  query<T = Record<string, unknown>>(sql: string): Promise<ReadonlyArray<T>>;
 
   /** Release the underlying connection. Idempotent. */
   close(): Promise<void>;

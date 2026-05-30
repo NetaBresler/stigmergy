@@ -27,6 +27,7 @@ describe("migrator", () => {
     expect(result.applied).toEqual([
       "001_framework_tables.sql",
       "002_trigger_signal_id.sql",
+      "003_network_layer.sql",
     ]);
 
     const tables = await client.query<{ tablename: string }>(
@@ -36,6 +37,8 @@ describe("migrator", () => {
     expect(names).toContain("stigmergy_agents");
     expect(names).toContain("stigmergy_signal_registry");
     expect(names).toContain("stigmergy_reinforcements");
+    expect(names).toContain("stigmergy_agent_tokens");
+    expect(names).toContain("stigmergy_worker_leases");
     expect(names).toContain("_stigmergy_migrations");
   });
 
@@ -57,6 +60,7 @@ describe("migrator", () => {
     expect(rows.map((r) => r.name)).toEqual([
       "001_framework_tables.sql",
       "002_trigger_signal_id.sql",
+      "003_network_layer.sql",
     ]);
   });
 

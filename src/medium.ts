@@ -11,8 +11,7 @@ import { runAgent } from "./runtime.js";
 import { shapeHash, shapeToColumns } from "./shape.js";
 import { quoteIdent } from "./sql.js";
 import type { Agent, Decay, Medium, MediumClient, Role, Signal, Validator } from "./types.js";
-import type { DispatcherHandle } from "./validator.js";
-import { createValidatorDispatcher } from "./validator.js";
+import type { WorkersHandle } from "./workers.js";
 
 /**
  * Runtime side of the Medium primitive. Owns:
@@ -51,8 +50,8 @@ export interface MediumState {
   readonly charterPathOrInline?: string;
   charter?: string;
   closed: boolean;
-  /** Singleton validator dispatcher; started on first run(). */
-  validatorDispatcher?: DispatcherHandle;
+  /** Background workers (decay sweep + validator dispatch); started lazily. */
+  workers?: WorkersHandle;
 }
 
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
@@ -189,15 +188,15 @@ function buildMedium(state: MediumState): Medium {
       (validator as { validate: typeof nextValidate }).validate = nextValidate;
     },
 
-    async query(sql) {
-      return state.client.query(sql);
+    async query<T = Record<string, unknown>>(sql: string) {
+      return state.client.query<T>(sql);
     },
 
     async close() {
       if (state.closed) return;
       state.closed = true;
-      if (state.validatorDispatcher) {
-        await state.validatorDispatcher.stop();
+      if (state.workers) {
+        await state.workers.stop();
       }
       if (state.ownsClient && state.client.close) {
         await state.client.close();
@@ -348,22 +347,6 @@ export function resolvedCharter(medium: Medium): string | undefined {
  */
 export function mediumState(medium: Medium): MediumState | undefined {
   return mediumStates.get(medium);
-}
-
-/**
- * Start the validator dispatcher on first demand. No-op on subsequent
- * calls. Called by runAgent() the first time an agent runs.
- */
-export function startValidatorDispatcherIfNeeded(medium: Medium): void {
-  const state = mediumStates.get(medium);
-  if (!state) return;
-  if (state.validatorDispatcher) return;
-  state.validatorDispatcher = createValidatorDispatcher(
-    state.client,
-    state.validators,
-    state.signals
-  );
-  state.validatorDispatcher.start();
 }
 
 /**

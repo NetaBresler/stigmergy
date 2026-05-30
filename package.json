@@ -11,6 +11,9 @@
       "import": "./dist/index.js"
     }
   },
+  "bin": {
+    "stigmergy": "./dist/cli.js"
+  },
   "files": ["dist", "src", "migrations"],
   "engines": {
     "node": ">=22"
