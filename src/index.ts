@@ -27,9 +27,11 @@ export type {
   PayloadOf,
   Role,
   RoleContext,
+  RunOptions,
   Signal,
   TypeOf,
   Validator,
   ValidatorContext,
   Verdict,
+  VerdictTarget,
 } from "./types.js";

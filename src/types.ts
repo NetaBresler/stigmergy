@@ -276,6 +276,31 @@ export type AgentHandler<A extends Agent<ReadonlyArray<Role>>> = (
 ) => Promise<void>;
 
 // ---------------------------------------------------------------------------
+// RunOptions — cadence and lifetime knobs for an agent loop.
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for `medium.run(agent, handler, opts)`.
+ *
+ * Phase 1 scheduling is interval polling. A handler is invoked every
+ * `intervalMs`; the decay sweep runs on its own `sweepIntervalMs` cadence
+ * so cleanup never stalls agent work. (LISTEN/NOTIFY-driven wakeups are a
+ * later option, not a Phase 1 commitment — see docs/api-sketch.md.)
+ */
+export interface RunOptions {
+  /** Milliseconds between handler invocations. Default 1000. */
+  readonly intervalMs?: number;
+  /** Milliseconds between decay-sweep passes. Default 5000. */
+  readonly sweepIntervalMs?: number;
+  /**
+   * Stop the loop after this many handler invocations. Default: no
+   * limit (runs until `medium.close()`). Useful for bounded runs —
+   * batch jobs, demos, and tests that want a deterministic end.
+   */
+  readonly maxTicks?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Medium — the entry point. Owns the registry.
 // ---------------------------------------------------------------------------
 
@@ -321,10 +346,19 @@ export interface Medium {
   migrate(): Promise<void>;
 
   /**
-   * Start an agent loop. The handler is invoked on a schedule (Phase 1
-   * will specify cadence and LISTEN/NOTIFY semantics).
+   * Start an agent loop. The handler is invoked every `opts.intervalMs`
+   * (default 1000), constructing a fresh bounded context each tick. One
+   * invocation per tick — back-pressure over concurrency, because tokens
+   * are expensive and the urgency lives in the medium, not the loop. The
+   * decay sweep and validator dispatch start lazily on the first `run`
+   * and stop when `medium.close()` fires. Resolves cleanly on close, or
+   * after `opts.maxTicks` invocations when set.
    */
-  run<A extends Agent<ReadonlyArray<Role>>>(agent: A, handler: AgentHandler<A>): Promise<void>;
+  run<A extends Agent<ReadonlyArray<Role>>>(
+    agent: A,
+    handler: AgentHandler<A>,
+    opts?: RunOptions
+  ): Promise<void>;
 
   /**
    * Hot-swap a validator's rule without restarting the colony. The

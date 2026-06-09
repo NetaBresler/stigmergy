@@ -34,7 +34,7 @@ npx tsx examples/bug-triage.ts       # 3 agents, ~5s — the teaching ground
 npx tsx examples/oss-maintainer.ts   # 10 agents, ~25s — the showcase
 ```
 
-`bug-triage.ts` walks a Reporter, two Triagers, and a Validator through every primitive — strength decay, claim races, cross-signal reinforcement — in about 240 lines. `oss-maintainer.ts` is the same framework turned up to ten agents across three simulated sensor streams; the summary at the bottom shows emergent specialization with no planner. See [`examples/README.md`](examples/README.md) for what's happening.
+`bug-triage.ts` walks a Reporter, two Triagers, and a Validator through every primitive — strength decay, claim races, cross-signal reinforcement — in about 300 lines. `oss-maintainer.ts` is the same framework turned up to ten agents across three simulated sensor streams; the summary at the bottom shows emergent specialization with no planner. See [`examples/README.md`](examples/README.md) for what's happening.
 
 ## Why this exists
 

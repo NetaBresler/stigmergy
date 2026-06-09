@@ -28,7 +28,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { z } from "zod";
 import { defineMedium, pgliteClient } from "../src/index.js";
-import { runAgent } from "../src/runtime.js";
 
 // ---------------------------------------------------------------------------
 // Seed pool for the Explorer
@@ -158,8 +157,7 @@ async function main(): Promise<void> {
 
   const roleCounts = { Explorer: 0, Worker: 0 };
 
-  await runAgent(
-    medium,
+  await medium.run(
     researcher,
     async (ctx) => {
       const explorerView = await ctx.as(ExplorerRole).view();

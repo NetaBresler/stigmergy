@@ -37,7 +37,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { z } from "zod";
 import { defineMedium, pgliteClient } from "../src/index.js";
-import { runAgent } from "../src/runtime.js";
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -337,8 +336,7 @@ async function main(): Promise<void> {
   // one tick = one event of the primary kind. Secondary kinds (PRs,
   // merges on the github sensor) piggyback on a modulo counter.
   let ghTick = 0;
-  const ghLoop = runAgent(
-    medium,
+  const ghLoop = medium.run(
     gh,
     async (ctx) => {
       if (!withinRun()) return;
@@ -366,8 +364,7 @@ async function main(): Promise<void> {
     { intervalMs: EVENT_RATE_MS.bug }
   );
 
-  const cmLoop = runAgent(
-    medium,
+  const cmLoop = medium.run(
     cm,
     async (ctx) => {
       if (!withinRun()) return;
@@ -382,8 +379,7 @@ async function main(): Promise<void> {
 
   // Social mentions: less frequent than GitHub issues and slightly
   // noisier (the validator decides what's real).
-  const scLoop = runAgent(
-    medium,
+  const scLoop = medium.run(
     sc,
     async (ctx) => {
       if (!withinRun()) return;
@@ -401,8 +397,7 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------
 
   const triageLoop = (agent: typeof triager1, intervalMs: number) =>
-    runAgent(
-      medium,
+    medium.run(
       agent,
       async (ctx) => {
         const queue = await ctx.as(TriagerRole).view();
@@ -453,8 +448,7 @@ async function main(): Promise<void> {
     );
 
   const respondLoop = (agent: typeof responder1, intervalMs: number) =>
-    runAgent(
-      medium,
+    medium.run(
       agent,
       async (ctx) => {
         const queue = await ctx.as(ResponderRole).view();
@@ -491,8 +485,7 @@ async function main(): Promise<void> {
     );
 
   const reviewLoop = (agent: typeof reviewer1, intervalMs: number) =>
-    runAgent(
-      medium,
+    medium.run(
       agent,
       async (ctx) => {
         const queue = await ctx.as(ReviewerRole).view();
@@ -509,8 +502,7 @@ async function main(): Promise<void> {
       { intervalMs }
     );
 
-  const broadcastLoop = runAgent(
-    medium,
+  const broadcastLoop = medium.run(
     broadcaster,
     async (ctx) => {
       const queue = await ctx.as(BroadcasterRole).view();

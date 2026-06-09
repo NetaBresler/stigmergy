@@ -22,7 +22,6 @@ describe("Medium.run()", () => {
   });
 
   it("invokes the handler `maxTicks` times and resolves", async () => {
-    const { runAgent } = await import("../src/runtime.js");
     const client = pgliteClient(db);
     const medium = defineMedium({ client });
 
@@ -41,8 +40,7 @@ describe("Medium.run()", () => {
     await medium.migrate();
 
     let calls = 0;
-    await runAgent(
-      medium,
+    await medium.run(
       scout,
       async () => {
         calls += 1;
@@ -54,7 +52,6 @@ describe("Medium.run()", () => {
   });
 
   it("stops cleanly when medium.close() fires mid-loop", async () => {
-    const { runAgent } = await import("../src/runtime.js");
     const client = pgliteClient(db);
     const medium = defineMedium({ client });
     const demand = medium.defineSignal({
@@ -72,8 +69,7 @@ describe("Medium.run()", () => {
     await medium.migrate();
 
     let calls = 0;
-    const run = runAgent(
-      medium,
+    const run = medium.run(
       agent,
       async () => {
         calls += 1;
@@ -87,7 +83,6 @@ describe("Medium.run()", () => {
   });
 
   it("threads deposits from the handler into the medium", async () => {
-    const { runAgent } = await import("../src/runtime.js");
     const client = pgliteClient(db);
     const medium = defineMedium({ client });
     const demand = medium.defineSignal({
@@ -106,8 +101,7 @@ describe("Medium.run()", () => {
 
     const niches = ["a", "b", "c"];
     let idx = 0;
-    await runAgent(
-      medium,
+    await medium.run(
       scout,
       async (ctx) => {
         const niche = niches[idx++];
@@ -125,7 +119,6 @@ describe("Medium.run()", () => {
   });
 
   it("validator dispatcher fires alongside the agent loop", async () => {
-    const { runAgent } = await import("../src/runtime.js");
     const client = pgliteClient(db);
     const medium = defineMedium({ client });
     const demand = medium.defineSignal({
@@ -149,8 +142,7 @@ describe("Medium.run()", () => {
     const scout = medium.defineAgent({ id: "scout-01", roles: [role] });
     await medium.migrate();
 
-    await runAgent(
-      medium,
+    await medium.run(
       scout,
       async (ctx) => {
         await ctx.as(role).deposit("demand", { niche: "x" });

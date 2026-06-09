@@ -4,11 +4,12 @@ This walks through what using Stigmergy feels like, end-to-end. The runtime it d
 
 ## Phase 1 revisions
 
-Three changes to the Phase 0 surface as implementation landed:
+Four changes to the Phase 0 surface as implementation landed:
 
 - **`medium.migrate()`** — explicit migration step. Apply framework tables and create per-signal-type tables from the currently registered definitions. Idempotent; rejects when a registered signal's stored shape hash no longer matches the code.
 - **`defineMedium({ client })`** — bring-your-own-client overload. The `{ url }` form opens postgres-js internally; `{ client }` accepts any `MediumClient` (PGlite in tests; a pooled connection or pgbouncer in production).
 - **`defineSignal` returns the Signal, not a widened Medium.** The Phase 0 types had `defineSignal` return `Medium<[...signals, newSignal]>` to make "signal must belong to this medium" a compile-time check. In practice that broke the natural idiom `const bug = medium.defineSignal(...); defineRole({ reads: [bug] })`. The accumulating type parameter has been removed from `Medium`; the constraint now lives at runtime (the medium rejects roles/validators referencing unregistered signals at `migrate()` time).
+- **`medium.run(agent, handler, opts?)`** — the loop takes an optional `RunOptions`: `intervalMs` (poll cadence, default 1000), `sweepIntervalMs` (decay-sweep cadence, default 5000), and `maxTicks` (stop after N invocations; default: run until `medium.close()`). Phase 0 had a bare `run(agent, handler)` with the cadence left unspecified — this is where open question #1 (scheduling) landed. The examples drive the loop entirely through this public method; there is no separate "run" entry point to import.
 
 ---
 
@@ -189,19 +190,25 @@ All four are optional. An agent with none is a valid agent — it just has a sta
 ```ts
 await medium.migrate();
 
-// Reporter files seed bugs one per tick.
-await medium.run(reporter, async (ctx) => {
-  const filed = await ctx.as(ReporterRole).view();
-  const seen = new Set(filed.map(b => b.payload.title));
-  const nextBug = SEED_BUGS.find(b => !seen.has(b.title));
-  if (!nextBug) return;
+// Reporter files seed bugs one per tick. The third arg is RunOptions:
+// poll every 150ms, stop after the backlog is filed. Omit it and the
+// loop polls every 1000ms and runs until medium.close().
+await medium.run(
+  reporter,
+  async (ctx) => {
+    const filed = await ctx.as(ReporterRole).view();
+    const seen = new Set(filed.map(b => b.payload.title));
+    const nextBug = SEED_BUGS.find(b => !seen.has(b.title));
+    if (!nextBug) return;
 
-  await ctx.as(ReporterRole).deposit("reported_bug", {
-    ...nextBug,
-    claimed_by: null,
-    claimed_until: null,
-  });
-});
+    await ctx.as(ReporterRole).deposit("reported_bug", {
+      ...nextBug,
+      claimed_by: null,
+      claimed_until: null,
+    });
+  },
+  { intervalMs: 150, maxTicks: SEED_BUGS.length + 2 },
+);
 
 // Triagers compete for claims and write a triage_note each.
 const triage = async (ctx: AgentContext<typeof triager1>) => {
@@ -231,9 +238,10 @@ const triage = async (ctx: AgentContext<typeof triager1>) => {
   // the unlikely case this triager crashes.
 };
 
+const opts = { intervalMs: 150, maxTicks: 12 };
 await Promise.all([
-  medium.run(triager1, triage),
-  medium.run(triager2, triage),
+  medium.run(triager1, triage, opts),
+  medium.run(triager2, triage, opts),
 ]);
 ```
 
@@ -305,7 +313,7 @@ No separate "adaptiveness primitive" exists because the existing primitives alre
 
 Flagged for Phase 1, not solved here:
 
-1. **Scheduling.** `medium.run()` starts a loop, but on what cadence? Polling interval? Postgres `LISTEN/NOTIFY`? Both?
+1. **Scheduling.** *(Resolved in Phase 1.)* `medium.run(agent, handler, opts)` polls: the handler fires every `opts.intervalMs` (default 1000), one invocation per tick — back-pressure over concurrency. The decay sweep runs on its own `opts.sweepIntervalMs` cadence so cleanup never stalls agent work, and `opts.maxTicks` bounds the loop for batch jobs and demos. Phase 1 commits to interval polling only; Postgres `LISTEN/NOTIFY`-driven wakeups stay a possible later addition, not a current guarantee.
 2. **Agent identity persistence.** `agentId` is on every deposit. Is one agent per process the right granularity, or can one process run several agents?
 3. **Reinforcement history on DepositedSignal.** If an agent wants to see "this signal has been reinforced three times in the last hour," it can't — the type doesn't expose history. Either we add it, or we say "query the medium directly" and keep the hot path lean.
 4. **Signal versioning.** `defineSignal` has no `version` field yet. For schema evolution across deployments, probably yes, but not Phase 0.

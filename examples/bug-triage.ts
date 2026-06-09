@@ -29,7 +29,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { z } from "zod";
 import { defineMedium, pgliteClient } from "../src/index.js";
-import { runAgent } from "../src/runtime.js";
 
 // ---------------------------------------------------------------------------
 // Seed data — a small backlog for the Reporter to file.
@@ -201,8 +200,7 @@ async function main(): Promise<void> {
 
   console.log("colony starting...\n");
 
-  const reporterLoop = runAgent(
-    medium,
+  const reporterLoop = medium.run(
     reporter,
     async (ctx) => {
       const filed = await ctx.as(ReporterRole).view();
@@ -220,8 +218,7 @@ async function main(): Promise<void> {
   );
 
   const triageLoop = (agentId: string) =>
-    runAgent(
-      medium,
+    medium.run(
       agentId === "triager-01" ? triager1 : triager2,
       async (ctx) => {
         const queue = await ctx.as(TriagerRole).view();

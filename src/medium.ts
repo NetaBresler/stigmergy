@@ -173,8 +173,8 @@ function buildMedium(state: MediumState): Medium {
       }
     },
 
-    async run(agent, handler) {
-      await runAgent(medium, agent, handler);
+    async run(agent, handler, opts) {
+      await runAgent(medium, agent, handler, opts);
     },
 
     updateValidator(validator, nextValidate) {

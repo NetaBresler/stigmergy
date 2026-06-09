@@ -26,11 +26,11 @@ npx tsx examples/oss-maintainer.ts   # 10 agents, ~25s run, emergent specializat
 
 ## Which one should I run first?
 
-**Start with `bug-triage.ts`** to learn the primitives. The teaching ground — about 240 lines, one file, every primitive appears exactly once. Read it end-to-end and you can write your own colony.
+**Start with `bug-triage.ts`** to learn the primitives. The teaching ground — about 300 lines, one file, every primitive appears exactly once. Read it end-to-end and you can write your own colony.
 
-**Read `polyethism.ts`** to see why **Agent** is a separate primitive from **Role**. About 180 lines, one file, one agent wearing two roles and switching between them tick-by-tick based on what the medium is loudest about. This is the smallest runnable demonstration of polyethism.
+**Read `polyethism.ts`** to see why **Agent** is a separate primitive from **Role**. About 235 lines, one file, one agent wearing two roles and switching between them tick-by-tick based on what the medium is loudest about. This is the smallest runnable demonstration of polyethism.
 
-**Read `oss-maintainer.ts`** to see why the pattern matters at scale. About 500 lines, ten agents, three sensor types — shows emergent specialization under load. The punchline is the summary at the bottom of the run output: agents self-select components without any planner assigning them.
+**Read `oss-maintainer.ts`** to see why the pattern matters at scale. About 750 lines, ten agents, three sensor types — shows emergent specialization under load. The punchline is the summary at the bottom of the run output: agents self-select components without any planner assigning them.
 
 ---
 
@@ -58,7 +58,7 @@ Everything is in one file. In order, you'll see:
 3. `defineRole` for Reporter and Triager, each with a bounded `localQuery`.
 4. `defineValidator` that applies a note's verdict to the matching bug via cross-signal `target`.
 5. `defineAgent` wrapping each role with a stable id.
-6. `runAgent` starting each loop.
+6. `medium.run(agent, handler, opts)` starting each loop — the public API, with `intervalMs` / `maxTicks` to keep the demo fast and bounded.
 
 ---
 

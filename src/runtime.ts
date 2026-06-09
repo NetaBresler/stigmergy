@@ -6,7 +6,15 @@ import {
   startValidatorDispatcherIfNeeded,
   tableNameFor,
 } from "./medium.js";
-import type { Agent, AgentHandler, Medium, MediumClient, Role, Signal } from "./types.js";
+import type {
+  Agent,
+  AgentHandler,
+  Medium,
+  MediumClient,
+  Role,
+  RunOptions,
+  Signal,
+} from "./types.js";
 
 /**
  * Runtime — the agent loop and medium-level maintenance.
@@ -26,15 +34,6 @@ import type { Agent, AgentHandler, Medium, MediumClient, Role, Signal } from "./
  *     cleanup shouldn't stall agent work.
  *   - Abort via `medium.close()`. The run promise resolves cleanly.
  */
-
-export interface RunOptions {
-  /** Milliseconds between handler invocations. Default 1000. */
-  readonly intervalMs?: number;
-  /** Milliseconds between decay-sweep passes. Default 5000. */
-  readonly sweepIntervalMs?: number;
-  /** For tests: stop after this many handler invocations. Default: no limit. */
-  readonly maxTicks?: number;
-}
 
 export async function runAgent<A extends Agent<ReadonlyArray<Role>>>(
   medium: Medium,
