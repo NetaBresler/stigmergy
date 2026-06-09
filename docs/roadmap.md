@@ -24,7 +24,7 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 
 ---
 
-## Phase 1 — Reference implementation *(current phase)*
+## Phase 1 — Reference implementation *(complete)*
 
 **Goal:** A working `stigmergy` npm package that runs against Postgres (Supabase-compatible) and implements the primitives spec'd in Phase 0.
 
@@ -50,11 +50,13 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 - Locality is enforced at the query-builder level — an agent's handler cannot read signals outside its `localQuery`. Tests must prove this.
 - API stays unchanged from Phase 0 unless a real implementation problem forces a revision; if it does, document the revision in `docs/api-sketch.md` before writing the code.
 
-**Done when:** `npm install stigmergy` (local, not yet published) gives a developer everything they need to define a colony, run it, and watch signals decay.
+**Done when:** `npm install stigmergy` (local, not yet published) gives a developer everything they need to define a colony, run it, and watch signals decay. ✓
+
+Met: 87 unit tests pass against PGlite plus 3 integration tests against real Postgres; `migrations/` stand up a bare schema; all three examples run end-to-end through the public `medium.run()`. CI (build / typecheck / lint / both test substrates / example smoke) runs on every push — pulled forward from Phase 3 because the quality gates needed protecting before the framework grows.
 
 ---
 
-## Phase 2 — Extract real usage from a first real project
+## Phase 2 — Extract real usage from a first real project *(current phase)*
 
 **Goal:** Use Stigmergy in anger on a first real project and surface what the framework is missing.
 
@@ -77,9 +79,9 @@ Phased plan for taking Stigmergy from a thesis to an installable framework that 
 
 **Deliverables:**
 - Published to npm.
-- A docs site (could be GitHub Pages initially) with: the Philosophy, the primitives, the API reference, the end-to-end example, a "how this compares to CrewAI / LangGraph / Agent Teams" page.
+- A docs site (could be GitHub Pages initially) with: the Philosophy, the primitives, the API reference, the end-to-end example, a "how this compares to CrewAI / LangGraph / Agent Teams" page. *(The API reference itself is written — [`docs/api-reference.md`](api-reference.md) — and just needs a site to host it. The comparison page is sketched across `prior-art.md` and the README pitch; it isn't a standalone page yet.)*
 - A short "read this first" blog post aimed at people who build agent systems.
-- A CONTRIBUTING.md covering API stability expectations, issue triage, and how to propose changes to the primitives.
+- ~~A CONTRIBUTING.md covering API stability expectations, issue triage, and how to propose changes to the primitives.~~ *(Done — [`CONTRIBUTING.md`](../CONTRIBUTING.md). Landed early; the repo started taking outside-shaped contributions in spirit before the publish push.)*
 
 **Rules for this phase:**
 - Announce once there's at least one third-party user (or at least one visible real-world use case). Don't ship into a void.
