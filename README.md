@@ -1,5 +1,7 @@
 # Stigmergy
 
+[![CI](https://github.com/NetaBresler/stigmergy/actions/workflows/ci.yml/badge.svg)](https://github.com/NetaBresler/stigmergy/actions/workflows/ci.yml)
+
 A framework for coordinating LLM agents through a shared environment with decay — rather than through a manager.
 
 ## Status

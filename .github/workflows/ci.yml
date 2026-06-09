@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    name: build · typecheck · lint · test
+    runs-on: ubuntu-latest
+
+    # A real Postgres so the integration suite runs alongside the PGlite
+    # unit tests. Without STIGMERGY_TEST_PG_URL those 3 tests skip; here
+    # we set it, so CI verifies the framework against both substrates —
+    # the claim the README makes on every push.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stigmergy
+          POSTGRES_PASSWORD: stigmergy
+          POSTGRES_DB: stigmergy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      STIGMERGY_TEST_PG_URL: postgres://stigmergy:stigmergy@localhost:5432/stigmergy_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # npm ci runs the package's `prepare` script, which builds via tsc.
+      # A failed build fails install — the first gate.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (PGlite unit suite + real-Postgres integration suite)
+        run: npm test
+
+      # The examples are part of the product — the README leads with them.
+      # Smoke-run the two fast ones against in-process PGlite so they can't
+      # bitrot out from under the runtime. (oss-maintainer is the timed
+      # showcase; the runtime it exercises is already covered above.)
+      - name: Example smoke test
+        run: |
+          npx tsx examples/bug-triage.ts
+          npx tsx examples/polyethism.ts
