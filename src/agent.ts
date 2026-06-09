@@ -66,8 +66,7 @@ export async function buildAgentContext<A extends Agent<ReadonlyArray<Role>>>(
     async writeMemory(text: string): Promise<void> {
       if (!memoryDoc) {
         throw new Error(
-          `Agent "${agent.id}" has no memory document declared; ` +
-            `call defineAgent({ memory: "./path/to/MEMORY.md", ... }) to enable writeMemory().`
+          `Agent "${agent.id}" has no memory document declared; call defineAgent({ memory: "./path/to/MEMORY.md", ... }) to enable writeMemory().`
         );
       }
       memoryDoc = await writeMarkdown(memoryDoc, text);

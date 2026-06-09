@@ -123,8 +123,7 @@ function buildMedium(state: MediumState): Medium {
       }
       if (def.localQuery.types.length !== 1) {
         throw new Error(
-          `Role "${def.name}" localQuery.types has ${def.localQuery.types.length} entries; ` +
-            `Phase 1 supports exactly one read type per role.`
+          `Role "${def.name}" localQuery.types has ${def.localQuery.types.length} entries; Phase 1 supports exactly one read type per role.`
         );
       }
       for (const type of def.localQuery.types) {
@@ -140,7 +139,7 @@ function buildMedium(state: MediumState): Medium {
 
     defineValidator(def) {
       for (const s of def.triggers) {
-        assertSignalRegistered(state, s, `triggers of validator`);
+        assertSignalRegistered(state, s, "triggers of validator");
       }
       state.validators.push(def);
       return def;
@@ -224,7 +223,7 @@ async function migrateSignal(client: MediumClient, signal: Signal): Promise<void
     decay_config: unknown;
     shape_hash: string;
   }>(
-    `SELECT table_name, decay_kind, decay_config, shape_hash FROM stigmergy_signal_registry WHERE type = $1`,
+    "SELECT table_name, decay_kind, decay_config, shape_hash FROM stigmergy_signal_registry WHERE type = $1",
     [signal.type]
   );
 
@@ -233,9 +232,7 @@ async function migrateSignal(client: MediumClient, signal: Signal): Promise<void
     if (!row) return;
     if (row.shape_hash !== hash) {
       throw new Error(
-        `Schema drift detected for signal "${signal.type}": stored shape hash ` +
-          `${row.shape_hash} does not match current code hash ${hash}. ` +
-          `Review your changes and run a migration explicitly.`
+        `Schema drift detected for signal "${signal.type}": stored shape hash ${row.shape_hash} does not match current code hash ${hash}. Review your changes and run a migration explicitly.`
       );
     }
     if (row.decay_kind !== signal.decay.kind) {
@@ -248,10 +245,7 @@ async function migrateSignal(client: MediumClient, signal: Signal): Promise<void
     const currentConfig = canonicalizeDecayConfig(signal.decay);
     if (storedConfig !== currentConfig) {
       throw new Error(
-        `Schema drift detected for signal "${signal.type}": stored decay config ` +
-          `${storedConfig} does not match current code ${currentConfig}. ` +
-          `Changing decay parameters silently would alter how every existing ` +
-          `signal of this type decays — run a migration explicitly.`
+        `Schema drift detected for signal "${signal.type}": stored decay config ${storedConfig} does not match current code ${currentConfig}. Changing decay parameters silently would alter how every existing signal of this type decays — run a migration explicitly.`
       );
     }
     // Table already exists by constraint; nothing more to do.
@@ -269,9 +263,9 @@ async function migrateSignal(client: MediumClient, signal: Signal): Promise<void
 
 function buildCreateTableSQL(tableName: string, shape: z.ZodTypeAny, decay: Decay): string {
   const metaCols = [
-    `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`,
-    `created_at timestamptz NOT NULL DEFAULT now()`,
-    `origin_agent_id text NOT NULL REFERENCES stigmergy_agents(id)`,
+    "id uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+    "created_at timestamptz NOT NULL DEFAULT now()",
+    "origin_agent_id text NOT NULL REFERENCES stigmergy_agents(id)",
   ];
   const decayCols = decayColumnsDDL(decay).map(String);
   const shapeCols = shapeToColumns(shape).map(

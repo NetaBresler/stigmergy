@@ -36,12 +36,42 @@ import { runAgent } from "../src/runtime.js";
 // ---------------------------------------------------------------------------
 
 const SEED_BUGS = [
-  { title: "login-loops-on-SSO",          component: "auth",     severity: 1, body: "user reports infinite redirect after IdP callback" },
-  { title: "slow-dashboard-on-firefox",   component: "frontend", severity: 2, body: "TTI > 8s on cold load, firefox only" },
-  { title: "duplicate-welcome-email",     component: "backend",  severity: 2, body: "new signups receive two emails. probably a retry bug" },
-  { title: "typo-in-footer",              component: "frontend", severity: 3, body: "says 'Copywrite' instead of 'Copyright'" },
-  { title: "favicon-missing",             component: "frontend", severity: 3, body: "some mobile browsers show default icon" },
-  { title: "payment-webhook-500s",        component: "backend",  severity: 1, body: "Stripe retries for 3 hours, no ingress" },
+  {
+    title: "login-loops-on-SSO",
+    component: "auth",
+    severity: 1,
+    body: "user reports infinite redirect after IdP callback",
+  },
+  {
+    title: "slow-dashboard-on-firefox",
+    component: "frontend",
+    severity: 2,
+    body: "TTI > 8s on cold load, firefox only",
+  },
+  {
+    title: "duplicate-welcome-email",
+    component: "backend",
+    severity: 2,
+    body: "new signups receive two emails. probably a retry bug",
+  },
+  {
+    title: "typo-in-footer",
+    component: "frontend",
+    severity: 3,
+    body: "says 'Copywrite' instead of 'Copyright'",
+  },
+  {
+    title: "favicon-missing",
+    component: "frontend",
+    severity: 3,
+    body: "some mobile browsers show default icon",
+  },
+  {
+    title: "payment-webhook-500s",
+    component: "backend",
+    severity: 1,
+    body: "Stripe retries for 3 hours, no ingress",
+  },
 ] as const;
 
 async function main(): Promise<void> {
@@ -206,9 +236,10 @@ async function main(): Promise<void> {
         // Toy heuristic for the demo: sev-1 "backend|auth" bugs are
         // confirmed loud; the two-liner frontend bugs are marked
         // duplicate; the "typo" bug is invalid (not really a bug).
-        const verdict = classify(target.payload as { title: string; component: string; severity: number; body: string });
-        const boost =
-          verdict === "confirm" ? 4 - (target.payload.severity as number) : 0;
+        const verdict = classify(
+          target.payload as { title: string; component: string; severity: number; body: string }
+        );
+        const boost = verdict === "confirm" ? 4 - (target.payload.severity as number) : 0;
 
         console.log(
           `[${agentId}] ${verdict.padEnd(9)} "${target.payload.title}" (strength ${(target.strength ?? 0).toFixed(2)})`
@@ -243,7 +274,7 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------
 
   const summary = await client.query<{ title: string; strength: string; component: string }>(
-    `SELECT title, component, strength::text AS strength FROM signal_reported_bug ORDER BY strength DESC`
+    "SELECT title, component, strength::text AS strength FROM signal_reported_bug ORDER BY strength DESC"
   );
   console.log("\nfinal bug pressure:");
   for (const row of summary) {
@@ -256,7 +287,10 @@ async function main(): Promise<void> {
 
 // The triage "model" for the demo. In a real colony this is an LLM call
 // using ctx.soul, ctx.skills, ctx.memory, and ctx.charter.
-function classify(bug: { title: string; component: string; severity: number; body: string }): "confirm" | "duplicate" | "invalid" {
+function classify(bug: { title: string; component: string; severity: number; body: string }):
+  | "confirm"
+  | "duplicate"
+  | "invalid" {
   if (bug.title.includes("typo")) return "invalid";
   if (bug.severity === 3) return "duplicate";
   return "confirm";

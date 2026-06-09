@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { durationSeconds, effectiveStrengthSQL, visibilityPredicate } from "./decay.js";
 import { depositSignalRow, tableNameFor } from "./medium.js";
 import { quoteIdent, quoteLiteral } from "./sql.js";
@@ -112,12 +112,12 @@ async function executeLocalQuery(
 
   const hasExpires = signal.decay.kind === "expiry";
   const projectedMeta = [
-    `s.id::text AS id`,
+    "s.id::text AS id",
     `${quoteLiteral(signal.type)} AS __type`,
-    `s.created_at AS created_at`,
-    `s.origin_agent_id AS origin_agent_id`,
+    "s.created_at AS created_at",
+    "s.origin_agent_id AS origin_agent_id",
     `(${effective})::text AS __strength`,
-    hasExpires ? `s.expires_at AS expires_at` : `NULL::timestamptz AS expires_at`,
+    hasExpires ? "s.expires_at AS expires_at" : "NULL::timestamptz AS expires_at",
   ];
   const projectedShape = shapeColumns.map((c) => `s.${quoteIdent(c)} AS ${quoteIdent(c)}`);
   const selectList = [...projectedMeta, ...projectedShape].join(", ");
@@ -293,8 +293,7 @@ function resolveReadSignal(role: Role): Signal {
   const types = role.localQuery.types;
   if (types.length !== 1) {
     throw new Error(
-      `Role "${role.name}" localQuery.types has ${types.length} entries; ` +
-        `Phase 1 supports exactly one read type per role`
+      `Role "${role.name}" localQuery.types has ${types.length} entries; Phase 1 supports exactly one read type per role`
     );
   }
   const type = types[0] as string;
@@ -316,12 +315,12 @@ async function fetchSignalById(
   const decayCtx = { signalType: signal.type, tableAlias: "s" };
   const effective = effectiveStrengthSQL(signal.decay, decayCtx);
   const projectedMeta = [
-    `s.id::text AS id`,
+    "s.id::text AS id",
     `${quoteLiteral(signal.type)} AS __type`,
-    `s.created_at AS created_at`,
-    `s.origin_agent_id AS origin_agent_id`,
+    "s.created_at AS created_at",
+    "s.origin_agent_id AS origin_agent_id",
     `(${effective})::text AS __strength`,
-    hasExpires ? `s.expires_at AS expires_at` : `NULL::timestamptz AS expires_at`,
+    hasExpires ? "s.expires_at AS expires_at" : "NULL::timestamptz AS expires_at",
   ];
   const projectedShape = shapeColumns.map((c) => `s.${quoteIdent(c)} AS ${quoteIdent(c)}`);
   const selectList = [...projectedMeta, ...projectedShape].join(", ");

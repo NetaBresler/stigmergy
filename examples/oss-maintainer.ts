@@ -345,16 +345,22 @@ async function main(): Promise<void> {
       ghTick += 1;
       const bug = synthBug("github");
       console.log(`[github] new issue: "${bug.title}" (${bug.component}, sev ${bug.severity})`);
-      await ctx.as(GithubListener).deposit("reported_bug", { ...bug, claimed_by: null, claimed_until: null });
+      await ctx
+        .as(GithubListener)
+        .deposit("reported_bug", { ...bug, claimed_by: null, claimed_until: null });
       if (ghTick % 3 === 0) {
         const pr = synthPr();
         console.log(`[github] new PR: "${pr.title}" (${pr.component})`);
-        await ctx.as(GithubListener).deposit("pr_submitted", { ...pr, claimed_by: null, claimed_until: null });
+        await ctx
+          .as(GithubListener)
+          .deposit("pr_submitted", { ...pr, claimed_by: null, claimed_until: null });
       }
       if (ghTick % 5 === 0) {
         const m = synthMerge();
         console.log(`[github] merged: "${m.pr_title}"`);
-        await ctx.as(GithubListener).deposit("merge_event", { ...m, claimed_by: null, claimed_until: null });
+        await ctx
+          .as(GithubListener)
+          .deposit("merge_event", { ...m, claimed_by: null, claimed_until: null });
       }
     },
     { intervalMs: EVENT_RATE_MS.bug }
@@ -367,7 +373,9 @@ async function main(): Promise<void> {
       if (!withinRun()) return;
       const q = synthQuestion();
       console.log(`[community] question from @${q.asker}: "${truncate(q.body)}"`);
-      await ctx.as(CommunityListener).deposit("community_question", { ...q, claimed_by: null, claimed_until: null });
+      await ctx
+        .as(CommunityListener)
+        .deposit("community_question", { ...q, claimed_by: null, claimed_until: null });
     },
     { intervalMs: EVENT_RATE_MS.question }
   );
@@ -381,7 +389,9 @@ async function main(): Promise<void> {
       if (!withinRun()) return;
       const bug = synthBug("social");
       console.log(`[social] mention: "${bug.title}" (${bug.component})`);
-      await ctx.as(SocialListener).deposit("reported_bug", { ...bug, claimed_by: null, claimed_until: null });
+      await ctx
+        .as(SocialListener)
+        .deposit("reported_bug", { ...bug, claimed_by: null, claimed_until: null });
     },
     { intervalMs: EVENT_RATE_MS.bug * 2 }
   );
@@ -404,7 +414,10 @@ async function main(): Promise<void> {
         // cleanly because tryClaim is atomic — exactly one succeeds.
         const bias = biases.get(agent.id) ?? affinity();
         const scored = queue
-          .map((s) => ({ signal: s, score: (s.strength ?? 1) * (bias[s.payload.component as Component] ?? 1) }))
+          .map((s) => ({
+            signal: s,
+            score: (s.strength ?? 1) * (bias[s.payload.component as Component] ?? 1),
+          }))
           .sort((a, b) => b.score - a.score);
 
         for (const { signal: bug } of scored) {
@@ -551,7 +564,7 @@ async function main(): Promise<void> {
   }
   const header = "  agent                         frontend    backend     infra";
   console.log(header);
-  console.log("  " + "─".repeat(header.length - 2));
+  console.log(`  ${"─".repeat(header.length - 2)}`);
   for (const [key, counts] of groupedBy) {
     console.log(
       `  ${key.padEnd(30)}${String(counts.frontend).padEnd(12)}${String(counts.backend).padEnd(12)}${String(counts.infra)}`
@@ -576,41 +589,137 @@ async function main(): Promise<void> {
 // SimulatedWorld — helpers that manufacture external events.
 // ---------------------------------------------------------------------------
 
-const BUG_TEMPLATES: ReadonlyArray<{ title: string; component: Component; severity: number; body: string }> = [
-  { title: "login-loops-on-SSO",         component: "backend",  severity: 1, body: "infinite redirect after IdP callback" },
-  { title: "stripe-webhook-500",         component: "backend",  severity: 1, body: "retries for hours, nothing ingested" },
-  { title: "slow-dashboard-firefox",     component: "frontend", severity: 2, body: "TTI > 8s on cold load, firefox only" },
-  { title: "duplicate-welcome-email",    component: "backend",  severity: 2, body: "new signups get two emails" },
-  { title: "blank-page-on-tablet",       component: "frontend", severity: 2, body: "iPad landscape, post-login" },
-  { title: "build-fails-on-arm",         component: "infra",    severity: 2, body: "CI arm64 runner segfaults mid-test" },
-  { title: "edge-cache-staleness",       component: "infra",    severity: 3, body: "some users see day-old data for ~5m" },
-  { title: "typo-in-footer",             component: "frontend", severity: 3, body: "says 'Copywrite'" },
-  { title: "healthcheck-flapping",       component: "infra",    severity: 2, body: "k8s liveness failing every ~10m" },
-  { title: "favicon-missing-safari",     component: "frontend", severity: 3, body: "default icon on some mobile safari" },
+const BUG_TEMPLATES: ReadonlyArray<{
+  title: string;
+  component: Component;
+  severity: number;
+  body: string;
+}> = [
+  {
+    title: "login-loops-on-SSO",
+    component: "backend",
+    severity: 1,
+    body: "infinite redirect after IdP callback",
+  },
+  {
+    title: "stripe-webhook-500",
+    component: "backend",
+    severity: 1,
+    body: "retries for hours, nothing ingested",
+  },
+  {
+    title: "slow-dashboard-firefox",
+    component: "frontend",
+    severity: 2,
+    body: "TTI > 8s on cold load, firefox only",
+  },
+  {
+    title: "duplicate-welcome-email",
+    component: "backend",
+    severity: 2,
+    body: "new signups get two emails",
+  },
+  {
+    title: "blank-page-on-tablet",
+    component: "frontend",
+    severity: 2,
+    body: "iPad landscape, post-login",
+  },
+  {
+    title: "build-fails-on-arm",
+    component: "infra",
+    severity: 2,
+    body: "CI arm64 runner segfaults mid-test",
+  },
+  {
+    title: "edge-cache-staleness",
+    component: "infra",
+    severity: 3,
+    body: "some users see day-old data for ~5m",
+  },
+  { title: "typo-in-footer", component: "frontend", severity: 3, body: "says 'Copywrite'" },
+  {
+    title: "healthcheck-flapping",
+    component: "infra",
+    severity: 2,
+    body: "k8s liveness failing every ~10m",
+  },
+  {
+    title: "favicon-missing-safari",
+    component: "frontend",
+    severity: 3,
+    body: "default icon on some mobile safari",
+  },
 ];
 
-const QUESTION_TEMPLATES: ReadonlyArray<{ channel: string; component: Component; body: string; asker: string }> = [
-  { channel: "slack", component: "backend",  asker: "ana",   body: "how do I rotate the stripe webhook secret without downtime?" },
-  { channel: "slack", component: "frontend", asker: "ben",   body: "dashboard feels slow on firefox. known?" },
-  { channel: "slack", component: "infra",    asker: "carla", body: "can we ship to the arm runners yet?" },
-  { channel: "discord", component: "backend",  asker: "dan",   body: "why does SSO loop sometimes?" },
-  { channel: "discord", component: "frontend", asker: "eve",   body: "is there a light mode on the roadmap?" },
-  { channel: "slack",   component: "infra",    asker: "finn",  body: "what's the cache TTL at the edge right now?" },
-  { channel: "discord", component: "backend",  asker: "gia",   body: "can I batch the exports API? getting 429s." },
-  { channel: "discord", component: "frontend", asker: "hal",   body: "ipad layout is blank for me. anyone else?" },
+const QUESTION_TEMPLATES: ReadonlyArray<{
+  channel: string;
+  component: Component;
+  body: string;
+  asker: string;
+}> = [
+  {
+    channel: "slack",
+    component: "backend",
+    asker: "ana",
+    body: "how do I rotate the stripe webhook secret without downtime?",
+  },
+  {
+    channel: "slack",
+    component: "frontend",
+    asker: "ben",
+    body: "dashboard feels slow on firefox. known?",
+  },
+  {
+    channel: "slack",
+    component: "infra",
+    asker: "carla",
+    body: "can we ship to the arm runners yet?",
+  },
+  { channel: "discord", component: "backend", asker: "dan", body: "why does SSO loop sometimes?" },
+  {
+    channel: "discord",
+    component: "frontend",
+    asker: "eve",
+    body: "is there a light mode on the roadmap?",
+  },
+  {
+    channel: "slack",
+    component: "infra",
+    asker: "finn",
+    body: "what's the cache TTL at the edge right now?",
+  },
+  {
+    channel: "discord",
+    component: "backend",
+    asker: "gia",
+    body: "can I batch the exports API? getting 429s.",
+  },
+  {
+    channel: "discord",
+    component: "frontend",
+    asker: "hal",
+    body: "ipad layout is blank for me. anyone else?",
+  },
 ];
 
 const PR_TEMPLATES: ReadonlyArray<{ title: string; component: Component; author: string }> = [
-  { title: "fix SSO redirect loop",              component: "backend",  author: "ana" },
-  { title: "bump firefox perf budget",           component: "frontend", author: "ben" },
-  { title: "arm64 CI runner, first pass",        component: "infra",    author: "carla" },
-  { title: "dedupe welcome emails",              component: "backend",  author: "dan" },
-  { title: "footer typo + lint rule",            component: "frontend", author: "eve" },
-  { title: "edge TTL → 30s for fresh endpoints", component: "infra",    author: "finn" },
+  { title: "fix SSO redirect loop", component: "backend", author: "ana" },
+  { title: "bump firefox perf budget", component: "frontend", author: "ben" },
+  { title: "arm64 CI runner, first pass", component: "infra", author: "carla" },
+  { title: "dedupe welcome emails", component: "backend", author: "dan" },
+  { title: "footer typo + lint rule", component: "frontend", author: "eve" },
+  { title: "edge TTL → 30s for fresh endpoints", component: "infra", author: "finn" },
 ];
 
 let bugIdx = 0;
-function synthBug(source: "github" | "social"): { title: string; component: Component; severity: number; source: string; body: string } {
+function synthBug(source: "github" | "social"): {
+  title: string;
+  component: Component;
+  severity: number;
+  source: string;
+  body: string;
+} {
   const tmpl = BUG_TEMPLATES[bugIdx % BUG_TEMPLATES.length];
   if (!tmpl) throw new Error("no bug templates");
   bugIdx += 1;

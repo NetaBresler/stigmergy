@@ -138,7 +138,7 @@ describe("expiry decay (integration)", () => {
     const stats = await sweepSignal(client, "test_expiry", "test_expiry", decay);
     expect(stats.deleted).toBe(2);
 
-    const remaining = await db.query(`SELECT count(*)::text AS count FROM test_expiry`);
+    const remaining = await db.query("SELECT count(*)::text AS count FROM test_expiry");
     expect((remaining.rows[0] as { count: string }).count).toBe("1");
   });
 });
@@ -222,7 +222,7 @@ describe("strength decay (integration)", () => {
     expect(stats.updated).toBe(1);
 
     const result = await db.query(
-      `SELECT strength::text AS strength, last_decay_at FROM test_strength`
+      "SELECT strength::text AS strength, last_decay_at FROM test_strength"
     );
     const row = result.rows[0] as { strength: string; last_decay_at: Date };
     const value = Number.parseFloat(row.strength);
@@ -240,7 +240,7 @@ describe("strength decay (integration)", () => {
     const stats = await sweepSignal(client, "test_strength", "test_strength", decay);
     expect(stats.deleted).toBe(1);
 
-    const remaining = await db.query(`SELECT count(*)::text AS count FROM test_strength`);
+    const remaining = await db.query("SELECT count(*)::text AS count FROM test_strength");
     expect((remaining.rows[0] as { count: string }).count).toBe("1");
   });
 });
@@ -285,7 +285,7 @@ describe("reinforcement decay (integration)", () => {
   });
 
   it("returns 0 effective strength when no reinforcements exist", async () => {
-    await db.exec(`INSERT INTO test_reinforcement DEFAULT VALUES;`);
+    await db.exec("INSERT INTO test_reinforcement DEFAULT VALUES;");
     const expr = effectiveStrengthSQL(decay, {
       signalType: "test_reinforcement",
       tableAlias: "s",
@@ -296,7 +296,7 @@ describe("reinforcement decay (integration)", () => {
 
   it("counts approvals in the window", async () => {
     const ins = await db.query<{ id: string }>(
-      `INSERT INTO test_reinforcement DEFAULT VALUES RETURNING id::text`
+      "INSERT INTO test_reinforcement DEFAULT VALUES RETURNING id::text"
     );
     const signalId = ins.rows[0]?.id as string;
 
@@ -321,7 +321,7 @@ describe("reinforcement decay (integration)", () => {
 
   it("ignores reinforcements outside the window", async () => {
     const ins = await db.query<{ id: string }>(
-      `INSERT INTO test_reinforcement DEFAULT VALUES RETURNING id::text`
+      "INSERT INTO test_reinforcement DEFAULT VALUES RETURNING id::text"
     );
     const signalId = ins.rows[0]?.id as string;
 
@@ -344,7 +344,7 @@ describe("reinforcement decay (integration)", () => {
 
   it("subtracts penalties from rejections", async () => {
     const ins = await db.query<{ id: string }>(
-      `INSERT INTO test_reinforcement DEFAULT VALUES RETURNING id::text`
+      "INSERT INTO test_reinforcement DEFAULT VALUES RETURNING id::text"
     );
     const signalId = ins.rows[0]?.id as string;
 

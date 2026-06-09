@@ -72,13 +72,15 @@ describe("validator dispatcher — approve + boost on strength-decay target", ()
     const dep = await scout.deposit("demand", { niche: "pickleball" });
     await scout.deposit("report", { niche: "pickleball", body: "looks promising" });
 
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.stop();
 
     // Strength on demand was boosted (started at 1.0, now 1.5).
     const strengths = await client.query<{ strength: string }>(
-      `SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid`,
+      "SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid",
       [dep.id]
     );
     expect(Number.parseFloat(strengths[0]?.strength ?? "0")).toBeCloseTo(1.5, 5);
@@ -127,12 +129,14 @@ describe("validator dispatcher — reject + penalty", () => {
     const scout = buildRoleContext(client, scoutRole, "agent-1");
     const dep = await scout.deposit("demand", { niche: "stale" });
 
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.stop();
 
     const strengths = await client.query<{ strength: string }>(
-      `SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid`,
+      "SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid",
       [dep.id]
     );
     expect(Number.parseFloat(strengths[0]?.strength ?? "0")).toBeCloseTo(0.2, 5);
@@ -149,11 +153,13 @@ describe("validator dispatcher — reject + penalty", () => {
     });
     const scout = buildRoleContext(client, scoutRole, "agent-1");
     const dep = await scout.deposit("demand", { niche: "punish" });
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.stop();
     const strengths = await client.query<{ strength: string }>(
-      `SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid`,
+      "SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid",
       [dep.id]
     );
     expect(Number.parseFloat(strengths[0]?.strength ?? "0")).toBe(0);
@@ -185,17 +191,19 @@ describe("validator dispatcher — approve + extend on expiry-decay target", () 
 
     // Capture initial expires_at
     const before = await client.query<{ expires_at: Date }>(
-      `SELECT expires_at FROM signal_report WHERE id = $1::uuid`,
+      "SELECT expires_at FROM signal_report WHERE id = $1::uuid",
       [dep.id]
     );
     const before_ms = (before[0]?.expires_at as Date).getTime();
 
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.stop();
 
     const after = await client.query<{ expires_at: Date }>(
-      `SELECT expires_at FROM signal_report WHERE id = $1::uuid`,
+      "SELECT expires_at FROM signal_report WHERE id = $1::uuid",
       [dep.id]
     );
     const after_ms = (after[0]?.expires_at as Date).getTime();
@@ -230,7 +238,9 @@ describe("validator dispatcher — idempotency", () => {
     const scout = buildRoleContext(client, scoutRole, "agent-1");
     await scout.deposit("demand", { niche: "once" });
 
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.tick();
     await dispatcher.tick();
@@ -252,7 +262,9 @@ describe("validator dispatcher — idempotency", () => {
     });
 
     const scout = buildRoleContext(client, scoutRole, "agent-1");
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
 
     await scout.deposit("demand", { niche: "first" });
     await dispatcher.tick();
@@ -287,7 +299,9 @@ describe("validator dispatcher — hot-swap", () => {
     });
 
     const scout = buildRoleContext(client, scoutRole, "agent-1");
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
 
     const a = await scout.deposit("demand", { niche: "a" });
     await dispatcher.tick();
@@ -300,7 +314,7 @@ describe("validator dispatcher — hot-swap", () => {
 
     const byNiche = async (id: string) => {
       const rows = await client.query<{ strength: string }>(
-        `SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid`,
+        "SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid",
         [id]
       );
       return Number.parseFloat(rows[0]?.strength ?? "0");
@@ -348,7 +362,9 @@ describe("validator dispatcher — cross-signal reinforcement dedup", () => {
     const dep = await scout.deposit("demand", { niche: "n" });
     await scout.deposit("report", { niche: "n", body: "b" });
 
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.tick();
     await dispatcher.tick();
@@ -360,7 +376,7 @@ describe("validator dispatcher — cross-signal reinforcement dedup", () => {
 
     // And the target's strength is boosted only once, too (started at 1.0).
     const strengths = await client.query<{ strength: string }>(
-      `SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid`,
+      "SELECT strength::text AS strength FROM signal_demand WHERE id = $1::uuid",
       [dep.id]
     );
     expect(Number.parseFloat(strengths[0]?.strength ?? "0")).toBeCloseTo(1.3, 5);
@@ -388,7 +404,9 @@ describe("validator dispatcher — cross-signal reinforcement dedup", () => {
     await scout.deposit("demand", { niche: "pickleball" });
     await scout.deposit("report", { niche: "pickleball", body: "b" });
 
-    const dispatcher = createValidatorDispatcher(client, [validator], signals, { intervalMs: 99_999 });
+    const dispatcher = createValidatorDispatcher(client, [validator], signals, {
+      intervalMs: 99_999,
+    });
     await dispatcher.tick();
     await dispatcher.stop();
 

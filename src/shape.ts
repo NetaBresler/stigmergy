@@ -34,8 +34,7 @@ export function shapeToColumns(shape: z.ZodTypeAny): ShapeColumn[] {
   const def = shape._def as { typeName?: string; shape?: () => Record<string, z.ZodTypeAny> };
   if (def.typeName !== "ZodObject" || typeof def.shape !== "function") {
     throw new Error(
-      "Stigmergy signal shapes must be ZodObject at the top level " +
-        `(got: ${def.typeName ?? "unknown"})`
+      `Stigmergy signal shapes must be ZodObject at the top level (got: ${def.typeName ?? "unknown"})`
     );
   }
   const fields = def.shape();

@@ -226,8 +226,7 @@ async function main(): Promise<void> {
   console.log(`  Explorer ticks: ${roleCounts.Explorer}`);
   console.log(`  Worker ticks:   ${roleCounts.Worker}`);
   console.log(
-    `  → one agent, split ${roleCounts.Explorer}/${roleCounts.Worker} across roles.` +
-      ` The medium picked for it.`
+    `  → one agent, split ${roleCounts.Explorer}/${roleCounts.Worker} across roles. The medium picked for it.`
   );
 }
 

@@ -162,11 +162,11 @@ describe("RoleContext.view()", () => {
     });
     // Force the stored strength to something well below the floor, as if
     // many decay periods have elapsed without persistence.
-    await db.exec(`UPDATE signal_demand SET strength = 0.001;`);
+    await db.exec("UPDATE signal_demand SET strength = 0.001;");
     const rows = await ctx.view();
     expect(rows).toHaveLength(0);
     // The row is still in the table (sweepSignal hasn't run); it's just invisible.
-    const raw = await db.query(`SELECT count(*)::text AS count FROM signal_demand`);
+    const raw = await db.query("SELECT count(*)::text AS count FROM signal_demand");
     expect((raw.rows[0] as { count: string }).count).toBe("1");
     void demand;
   });
@@ -225,7 +225,7 @@ describe("RoleContext.deposit()", () => {
     ).rejects.toThrow();
 
     // And the table is untouched.
-    const rows = await db.query(`SELECT count(*)::text AS count FROM signal_demand`);
+    const rows = await db.query("SELECT count(*)::text AS count FROM signal_demand");
     expect((rows.rows[0] as { count: string }).count).toBe("0");
   });
 });

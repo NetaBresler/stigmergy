@@ -118,7 +118,7 @@ describe("Medium.run()", () => {
     );
 
     const rows = await client.query<{ niche: string }>(
-      `SELECT niche FROM signal_demand ORDER BY niche`
+      "SELECT niche FROM signal_demand ORDER BY niche"
     );
     expect(rows.map((r) => r.niche)).toEqual(["a", "b", "c"]);
     await medium.close();
@@ -161,14 +161,14 @@ describe("Medium.run()", () => {
     // The dispatcher runs asynchronously. Wait for it to process.
     for (let i = 0; i < 20; i++) {
       const rows = await client.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM stigmergy_reinforcements`
+        "SELECT count(*)::text AS count FROM stigmergy_reinforcements"
       );
       if ((rows[0]?.count ?? "0") === "1") break;
       await new Promise((r) => setTimeout(r, 50));
     }
 
     const rows = await client.query<{ strength: string }>(
-      `SELECT strength::text AS strength FROM signal_demand`
+      "SELECT strength::text AS strength FROM signal_demand"
     );
     expect(Number.parseFloat(rows[0]?.strength ?? "0")).toBeCloseTo(1.5, 5);
 
@@ -211,7 +211,7 @@ describe("sweepAllSignals", () => {
     `);
 
     const signals = Array.from(
-      (await client.query<{ type: string }>(`SELECT type FROM stigmergy_signal_registry`)).values()
+      (await client.query<{ type: string }>("SELECT type FROM stigmergy_signal_registry")).values()
     );
     expect(signals.length).toBe(2);
 

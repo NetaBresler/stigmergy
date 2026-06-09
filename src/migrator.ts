@@ -49,7 +49,7 @@ export async function migrate(
   }
 
   const appliedRows = await client.query<{ name: string }>(
-    `SELECT name FROM _stigmergy_migrations`
+    "SELECT name FROM _stigmergy_migrations"
   );
   const applied = new Set(appliedRows.map((r) => r.name));
 
@@ -57,7 +57,7 @@ export async function migrate(
   for (const file of pending) {
     const sql = await readFile(join(migrationsDir, file), "utf8");
     await client.exec(sql);
-    await client.query(`INSERT INTO _stigmergy_migrations (name) VALUES ($1)`, [file]);
+    await client.query("INSERT INTO _stigmergy_migrations (name) VALUES ($1)", [file]);
   }
 
   return { applied: pending };

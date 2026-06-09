@@ -106,7 +106,7 @@ describe("defineSignal + migrate", () => {
       table_name: string;
       decay_kind: string;
       shape_hash: string;
-    }>(`SELECT type, table_name, decay_kind, shape_hash FROM stigmergy_signal_registry`);
+    }>("SELECT type, table_name, decay_kind, shape_hash FROM stigmergy_signal_registry");
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0]?.type).toBe("scout_report");
     expect(rows.rows[0]?.table_name).toBe("signal_scout_report");
@@ -125,7 +125,7 @@ describe("defineSignal + migrate", () => {
     await medium.migrate();
 
     const rows = await db.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM stigmergy_signal_registry`
+      "SELECT count(*)::text AS count FROM stigmergy_signal_registry"
     );
     expect(rows.rows[0]?.count).toBe("1");
   });
@@ -271,7 +271,7 @@ describe("depositSignalRow (internal helper used by the role runtime)", () => {
     await medium.migrate();
 
     // Seed an agent row so the FK succeeds.
-    await db.query(`INSERT INTO stigmergy_agents (id) VALUES ($1)`, ["scout-01"]);
+    await db.query("INSERT INTO stigmergy_agents (id) VALUES ($1)", ["scout-01"]);
 
     const deposited = await depositSignalRow(pgliteClient(db), signal, "scout-01", {
       niche: "cat-photography",
@@ -284,7 +284,7 @@ describe("depositSignalRow (internal helper used by the role runtime)", () => {
       claimed_by: string | null;
       strength: string;
       origin_agent_id: string;
-    }>(`SELECT niche, claimed_by, strength::text, origin_agent_id FROM signal_demand_pheromone`);
+    }>("SELECT niche, claimed_by, strength::text, origin_agent_id FROM signal_demand_pheromone");
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0]?.niche).toBe("cat-photography");
     expect(rows.rows[0]?.claimed_by).toBeNull();
@@ -372,7 +372,7 @@ describe("query (inspection escape hatch)", () => {
       shape: z.object({ v: z.string() }),
     });
     await medium.migrate();
-    const rows = await medium.query(`SELECT 42 AS answer`);
+    const rows = await medium.query("SELECT 42 AS answer");
     expect(rows[0]).toEqual({ answer: 42 });
   });
 });

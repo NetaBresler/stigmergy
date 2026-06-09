@@ -150,7 +150,7 @@ describe.skipIf(!PG_URL)("postgres-js adapter (real Postgres)", () => {
     await dispatcher.stop();
 
     const rows = await client.query<{ strength: string }>(
-      `SELECT strength::text AS strength FROM signal_pg_demand WHERE id = $1::uuid`,
+      "SELECT strength::text AS strength FROM signal_pg_demand WHERE id = $1::uuid",
       [dep.id]
     );
     expect(Number.parseFloat(rows[0]?.strength ?? "0")).toBeCloseTo(1.4, 5);

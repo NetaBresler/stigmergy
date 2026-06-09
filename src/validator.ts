@@ -309,7 +309,7 @@ async function lookupDecayKind(
   signalType: string
 ): Promise<"expiry" | "strength" | "reinforcement"> {
   const rows = await client.query<{ decay_kind: "expiry" | "strength" | "reinforcement" }>(
-    `SELECT decay_kind FROM stigmergy_signal_registry WHERE type = $1`,
+    "SELECT decay_kind FROM stigmergy_signal_registry WHERE type = $1",
     [signalType]
   );
   const first = rows[0];
