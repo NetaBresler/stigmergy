@@ -50,9 +50,11 @@ We're building that tool.
 - [`docs/primitives.md`](docs/primitives.md) — the six primitives that make a system stigmergic.
 - [`docs/files.md`](docs/files.md) — the CHARTER / SOUL / SKILL / MEMORY convention.
 - [`docs/api-sketch.md`](docs/api-sketch.md) — what the code looks like end-to-end.
+- [`docs/api-reference.md`](docs/api-reference.md) — every export, with signatures.
 - [`docs/colony-dynamics.md`](docs/colony-dynamics.md) — phenomena that emerge from the primitives, and how to diagnose them.
 - [`docs/prior-art.md`](docs/prior-art.md) — what exists, with citations.
 - [`docs/roadmap.md`](docs/roadmap.md) — what we're building, in phases.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to contribute, and the bar for changing a primitive.
 
 ## License
 
